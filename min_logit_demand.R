@@ -1,4 +1,3 @@
-# Let's make this a little more real, Assume gamma claims and logit demand where there are N potential customers.
 library(tidyverse)
 library(ggnewscale) # add new color scale -> new_scale_color
 # Set color brewer
@@ -10,7 +9,6 @@ source("utils.R")  # functions
 source("Parameters.R")  # Parameters used in numerical analysis
 
 
-
 # First Marginal ----
 
 out_1 <- one_loading_inference_indp(N = N[1], 
@@ -19,7 +17,7 @@ out_1 <- one_loading_inference_indp(N = N[1],
                                     h_x = 100,
                                     lambda = lambda[1], 
                                     claim_mean = k[1]*beta[1],
-                                    x_surplus = x_surplus, 
+                                    x_surplus = x_surplus[1], 
                                     demand = demand_1, 
                                     theta_finess = 0.01,
                                     S_ = S_marginal, 
@@ -59,7 +57,7 @@ out_2 <- one_loading_inference_indp(N = N[2],
                                     h_x = 100,
                                     claim_mean = k[2]*beta[2], 
                                     theta_finess = 0.005,
-                                    x_surplus = x_surplus, 
+                                    x_surplus = x_surplus[1], 
                                     demand = demand_2, 
                                     S_ = S_marginal, 
                                     shape = k[2], 

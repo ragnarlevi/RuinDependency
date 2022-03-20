@@ -5,16 +5,15 @@
 # fixed cost is operation cost
 # r should be 0
 
-# Fix some surplus values surpluses used 
-x_surplus <- c(100, 5000, 15000, 20000) #, round(beta*k*lambda*N*demand(1), digits = -1))
+# Fix some surplus values
+x_surplus <- c(100, 5000, 15000, 20000)
 
-# Define first claim
-
-N <- c(10000, 10000)
-k <- c(2, 2)
+# Define claims
+N <- c(1, 1)
+k <- c(2, 6)
 beta <- c(500, 500)
-lambda <- c(0.08, 0.08)
-fixed_cost <-   0.2*k*beta*N*lambda*0.4
+lambda <- c(0.08, 0.03)
+fixed_cost <-   0.1*k*beta*N*lambda*0.3 # Cost is 20% of a 30% market share
 r <- c(0,0) 
 
 nu <- 1
@@ -28,8 +27,8 @@ S_ <- function(x, a, b){
 #' @param b1 - logit parameter intercept
 #' @param b2 - logit parameter loading slope
 demand_1 <- function(theta){
-  b1 <- -0.6
-  b2 <- 4
+  b1 <- log((1-0.3)/0.3) - 1/(1-0.3)
+  b2 <- 1/(0.2*(1-0.3))
   
   1/(1+exp(b1+b2*theta))
 }
@@ -37,8 +36,8 @@ demand_1 <- function(theta){
 #' @param b1 - logit parameter intercept
 #' @param b2 - logit parameter loading slope
 demand_2 <- function(theta){
-  b1 <- -0.6
-  b2 <- 4.5
+  b1 <- log((1-0.3)/0.3) - 1/(1-0.3)
+  b2 <- 1/(0.22*(1-0.3))
   
   1/(1+exp(b1+b2*theta))
 }
@@ -46,8 +45,7 @@ demand_2 <- function(theta){
 demand <- function(theta){
   b1 <- c(-0.6, 4)
   b2 <- c(-0.6, 4.5)
-  return(c(1/(1+exp(b1[1]+b1[2]*theta)), 1/(1+exp(b2[1]+b2[2]*theta))))
-  #return(c(1,1))
+  return(c(demand_1(theta), demand_2(theta)))
 }
 
 

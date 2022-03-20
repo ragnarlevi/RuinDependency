@@ -162,7 +162,7 @@ one_loading_inference_indp <- function(N, r, fixed_cost, lambda = rep(1, length(
     l <- N*demand(thetas[i])*lambda/sum(N*demand(thetas[i])*lambda)
     claim_mean_tmp <- sum(claim_mean*l)
     expected_income[[i]] <- (1+thetas[i])*sum(N*demand(thetas[i])*(lambda*claim_mean-r)) - sum(fixed_cost) - claim_mean_tmp*sum(lambda*N*demand(thetas[i]))
-  }
+    }
   expected_income <- unlist(expected_income)
   
   
@@ -305,7 +305,7 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
   }
   
   
-  # assume exponential margin, straight forward to adjust for more general case
+  # assume exponential margin, 
   f_bivariate <- function(x1, x2, nu, a, b, l1, l2, l_common){
     
     copula_density <- function(u1, u2, nu){
@@ -348,12 +348,10 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
       return(integrate(int_function, lower = 0, upper = z)$value) 
     }
   }
-  
   f_z <- Vectorize(f_z, vectorize.args = "z")
   
   
   # Density of the marginal common jump
-  
   f_1perp <- function(x, l1, l2, a,b, nu){
     
     l_common <- clayton_copula(l1,l2,nu)
@@ -362,10 +360,9 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
       (l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu-1)*l1*dgamma(x = x, shape = a, scale = b)/l_common
     
   }
-  
   f_1perp <- Vectorize(f_1perp, vectorize.args = "x")
   
-  integrate(f_1perp, lower = 0, upper = 100, l1 = 3, l2 = 4, a = 2, b = 5, nu = 0.2)
+  
   
   
   f_combined <- function(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2){
