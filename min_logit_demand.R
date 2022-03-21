@@ -17,7 +17,7 @@ out_1 <- one_loading_inference_indp(N = N[1],
                                     h_x = 100,
                                     lambda = lambda[1], 
                                     claim_mean = k[1]*beta[1],
-                                    x_surplus = x_surplus[1], 
+                                    x_surplus = x_surplus, 
                                     demand = demand_1, 
                                     theta_finess = 0.01,
                                     S_ = S_marginal, 
@@ -57,7 +57,7 @@ out_2 <- one_loading_inference_indp(N = N[2],
                                     h_x = 100,
                                     claim_mean = k[2]*beta[2], 
                                     theta_finess = 0.005,
-                                    x_surplus = x_surplus[1], 
+                                    x_surplus = x_surplus, 
                                     demand = demand_2, 
                                     S_ = S_marginal, 
                                     shape = k[2], 
@@ -129,15 +129,9 @@ out_1$opt_ruin_theta
 out_2$opt_ruin_theta
 out_one_indp$opt_ruin_theta
 
-l <- c(N_1*lambda_1*demand_1(out_1$opt_ruin_theta), N_2*lambda_2*demand_2(out_2$opt_ruin_theta))
-
-sum(l*c(out_1$opt_ruin_theta, out_2$opt_ruin_theta)/sum(l))
-
-
 
 # Joint with Levy copula dependence ----
 # These take some time to calculate, The higher the surplus, the higher the complexity.
-# Can
 
 
   
@@ -168,6 +162,8 @@ out_both_one_dep_1 <- one_loading_inference_dep(N = N,
                                                 h_x = 100, 
                                                 f_z_max = 20000, 
                                                 theta_finess = 0.01)
+ 
+save.image("./Data_clayton.RData")
 
 out_both_one_dep_3 <- one_loading_inference_dep(N = N, 
                                                 r = r, 
@@ -178,9 +174,11 @@ out_both_one_dep_3 <- one_loading_inference_dep(N = N,
                                                 beta = beta,
                                                 x_surplus = x_surplus[3],
                                                 demand = demand, 
-                                                h_x = 500, 
+                                                h_x = 100, 
                                                 f_z_max = 20000, 
                                                 theta_finess = 0.02)
+
+save.image("./Data_clayton.RData")
 
 out_both_one_dep_4 <- one_loading_inference_dep(N = N, 
                                                 r = r, 
@@ -194,6 +192,8 @@ out_both_one_dep_4 <- one_loading_inference_dep(N = N,
                                                 h_x = 500, 
                                                 f_z_max = 10000, 
                                                 theta_finess = 0.02)
+
+save.image("./Data_clayton.RData")
 
 #save(out_both_one_dep_3, file = "dep_3.RData")
 
@@ -313,77 +313,9 @@ gg
 
 
 
-
-
-
-
-# Test many thetas ----
-# Same values as first
-
-
-S_ <-  function(x, shape, scale) 1-pgamma(q = x,shape = shape, scale = scale)
-
-optimal <- out_1$opt_ruin_theta
-
-check_thetas <- c(seq(from = 0.1, to = 0.8, by = 0.02), optimal[1])
-
-test_thetas <- list()
-
-S_ <- function(x, a, b){
-  return(1 - pgamma(q = x, shape = a, scale = b))
-}
-for(i in 1:length(check_thetas)){
-  print(i)
-  # (1+thetas[i])*sum(N*demand(thetas[i])*(lambda*claim_mean-r)) - sum(fixed_cost) - claim_mean*sum(lambda*N*demand(thetas[i]))
-  l <- N_1*demand_1(check_thetas[i])*lambda_1/sum(N_1*demand_1(check_thetas[i])*lambda_1)
-  
-  S_tmp<- function(x, a, b){
-    
-    return(sum(l*S_(x, a, b)))
-    
-  }
-  S_tmp <- Vectorize(S_tmp, vectorize.args = "x")
-  
-  
-  
-  mean_true <-  sum(k_1*beta_1*l)
-  lambda_true <-  sum(lambda_1*N_1*demand_1(check_thetas[i]))
-  p <-  (1+check_thetas[i])*sum(N_1*demand_1(check_thetas[i])*(lambda_1*k_1*beta_1-r_1)) - sum(fixed_cost_1)
-  
-  out_tmp <- infnite_survival3(to = 40000, 
-                            h_x = 100, 
-                            p = p, 
-                            lambda_true = lambda_true,
-                            mean_true = mean_true,
-                            S_ = S_tmp,
-                            a = k_1, b = beta_1)
-  
-  test_thetas[[i]] <- data.frame(x = out_tmp$x, V = out_tmp$V, id = paste(check_thetas[i]))
-  
-}
-
-test_thetas <- do.call(rbind, test_thetas)
-
-optimal_df <- test_thetas[test_thetas$id == paste0(optimal[1]), ]
-rest_df <- test_thetas[test_thetas$id != paste0(optimal[1]), ]
-
-ggplot() + geom_line(aes(x = x, y = V, group = id ), rest_df, color ="grey", alpha = 0.8) +
-  geom_line(aes(x = x, y = V, group = id ), optimal_df, color = "#2171B5", size = 1) + 
-  theme_bw(base_size = 20) +
-  scale_x_continuous(expand = c(0.0015, 0),limits = c(0, 40000+1000), name = "Surplus") +
-  scale_y_continuous(expand = c(0.002, 0), limits = c(0,1), name = "Probability of Ruin \n") +
-  geom_hline(yintercept = 0, color = "black", size = 1) +
-  geom_vline(xintercept = 0, color = "black", size = 1) 
-  
 # Both, two, indp, ----  
   
 
-demand <- function(theta1, theta2){
-  b1 <- c(-0.6, 4)
-  b2 <- c(-0.6, 4.5)
-  return(c(1/(1+exp(b1[1]+b1[2]*theta1)), 1/(1+exp(b2[1]+b2[2]*theta2))))
-  
-}
 
 S_ <- function(x, a, b){
   

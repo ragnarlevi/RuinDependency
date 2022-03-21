@@ -18,10 +18,6 @@ r <- c(0,0)
 
 nu <- 1
 
-S_ <- function(x, a, b){
-  
-  return(c(1-pgamma(q = x , shape = a[1], scale = b[1]), 1-pgamma(q = x , shape = a[2], scale = b[2])))
-}
 
 
 #' @param b1 - logit parameter intercept
@@ -43,8 +39,6 @@ demand_2 <- function(theta){
 }
 
 demand <- function(theta){
-  b1 <- c(-0.6, 4)
-  b2 <- c(-0.6, 4.5)
   return(c(demand_1(theta), demand_2(theta)))
 }
 
