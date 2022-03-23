@@ -97,7 +97,7 @@ out_one_indp <- one_loading_inference_indp(N = N,
                                            demand = demand, 
                                            h_x = 100,
                                            x_surplus = x_surplus,
-                                           theta_finess = 0.01,
+                                           theta_finess = 0.005,
                                            S_ = S_, 
                                            a = k, 
                                            b = beta)
@@ -197,7 +197,7 @@ save.image("./Data_clayton.RData")
 
 #save(out_both_one_dep_3, file = "dep_3.RData")
 
-df_dep <- rbind(out_both_one_dep_1$df, out_both_one_dep_2$df, out_both_one_dep_3$df, out_both_one_dep_4$df)
+df_dep <- rbind(out_both_one_dep_1$df, out_both_one_dep_2$df, out_both_one_dep_3$df)
 profit_lines_dep <-  data.frame(x = out_both_one_dep_1$thetas, y = out_both_one_dep_1$expected_proift/out_one_indp$optimal_expected_profit, id = "Expected Profit Dependence")
 profit_lines_indp <- data.frame(x = out_one_indp$thetas, y = out_one_indp$expected_proift/out_one_indp$optimal_expected_profit, id = "Expected Profit Independence")
 v_min_dep <- df_dep %>% group_by(surplus) %>% 
@@ -232,9 +232,9 @@ for( j in 1:length(surplus_tmp)){
   df_dep_tmp$surplus[df_dep_tmp$surplus == surplus_tmp[j]] <-  paste0(surplus_tmp[j], " -> ", tmp_min, sep = "")
 }
 df_dep_tmp$surplus <- factor(df_dep_tmp$surplus, 
-                              levels =c("100 -> 0.92",
-                                        "5000 -> 0.61", 
-                                        "15000 -> 0.26",
+                              levels =c("100 -> 0.87",
+                                        "5000 -> 0.57", 
+                                        "15000 -> 0.24",
                                         "20000 -> 0.15") )
 
 df_indp_tmp <- out_one_indp$df
@@ -245,8 +245,8 @@ for( j in 1:length(surplus_tmp)){
   df_indp_tmp$surplus[df_indp_tmp$surplus == surplus_tmp[j]] <-  paste0(surplus_tmp[j], " -> ", tmp_min, sep = "")
 }
 df_indp_tmp$surplus <- factor(df_indp_tmp$surplus, 
-                             levels =c("100 -> 0.92",
-                                       "5000 -> 0.57", 
+                             levels =c("100 -> 0.87",
+                                       "5000 -> 0.55", 
                                        "15000 -> 0.21",
                                        "20000 -> 0.13",
                                        "30000 -> 0.05",
@@ -322,133 +322,45 @@ S_ <- function(x, a, b){
   return(c(1-pgamma(q = x , shape = a[1], scale = b[1]), 1-pgamma(q = x , shape = a[2], scale = b[2])))
 }
   
-out_two_loading_indp_15000 <-  two_loadings_indep(N = N, r = r, fixed_cost = fixed_cost, lambda = lambda, k = k, beta = beta, claim_mean = k*beta, demand = demand,
-                                               x_surplus = 15000, h_x = 100, S_ = S_, a = k, b = beta)
-out_two_loading_indp_2000 <-  two_loadings_indep(N = N, r = r, fixed_cost = fixed_cost, lambda = lambda, k = k, 
-                                                 beta = beta, claim_mean = k*beta, demand = demand,
-                                                 x_surplus = 5000, h_x = 100, S_ = S_, a = k, b = beta)
-out_two_loading_indp_30000 <-  two_loadings_indep(N = N, r = r, fixed_cost = fixed_cost, lambda = lambda, k = k, 
-                                                  beta = beta, claim_mean = k*beta, demand = demand,
-                                                  x_surplus = 30000, h_x = 100, S_ = S_, a = k, b = beta)
+out_two_loading_indp_1 <-  two_loadings_indep(N = N, r = r, fixed_cost = fixed_cost, lambda = lambda, k = k, beta = beta, 
+                                              claim_mean = k*beta, demand = demand2var,
+                                               x_surplus = x_surplus[2], h_x = 100, S_ = S_, a = k, b = beta)
   
   
   
-  plot_ruin <- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, v_min = NA ){
-    fig_ruin <- plot_ly(showscale = TRUE,
-                        type = type,
-                        y = ~ t1,
-                        x = ~ t2,
-                        z = ~ V,
-                        colorbar=list(title="Ruin Prob.", 
-                                      tickfont = list(size = 20),
-                                      titlefont = list(size = 24)))
-    
-    fig_ruin <- fig_ruin %>% layout(yaxis = list(title = "&#952;<sub>1</sub>", 
-                                                 tickfont = list(size = 22), 
-                                                 titlefont = list(size = 24), 
-                                                 range = c(0, 0.8)),
-                                    xaxis = list(title = "&#952;<sub>2</sub>", 
-                                                 tickfont = list(size = 22), 
-                                                 titlefont = list(size = 24),
-                                                 range = c(0, 0.8)))
-    
-    
-    text <- paste0("(",t2_opt, ",", t1_opt, ")-> ",v_min, sep ="" )
-    
-    fig_ruin <- fig_ruin %>% colorbar(limits = c(0,1) ) %>%
-      add_annotations(x = t2_opt, y = t1_opt, text = text, font = list(color = "black", 
-                                                                       size = 20), arrowcolor="black")
-    
+ 
   
-    
-    fig_ruin
-  }
+plot_ruin(out_two_loading_indp_1$V, out_two_loading_indp_1$theta_1, out_two_loading_indp_1$theta_2,
+          type = "contour", t1_opt = out_two_loading_indp_1$t1_opt, t2_opt = out_two_loading_indp_1$t2_opt, 
+          v_min = round(min(out_two_loading_indp_1$V[!is.na(out_two_loading_indp_1$V)]), digits = 2))
 
-  plot_profit<- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, prof_max = NA ){
-    fig_ruin <- plot_ly(showscale = TRUE,
-                        type = type,
-                        y = ~ t1,
-                        x = ~ t2,
-                        z = ~ V,
-                        colorbar=list(title="Expected Profit", 
-                                      tickfont = list(size = 20), 
-                                      titlefont = list(size = 24)  ) )
-    fig_ruin <- fig_ruin %>% layout(yaxis = list(title = "&#952;<sub>1</sub>", 
-                                                 tickfont = list(size = 22),
-                                                 titlefont = list(size = 24)),
-                                    xaxis = list(title = "&#952;<sub>2</sub>", 
-                                                 tickfont = list(size = 22), 
-                                                 titlefont = list(size = 24)))
-    
-    text <- paste0("(",t2_opt, ",", t1_opt, ")-> ", prof_max, sep ="" )
-    
-    fig_ruin <- fig_ruin  %>%
-      add_annotations(x = t2_opt, y = t1_opt, text = text, font = list(color = "black", size = 20),
-                      arrowcolor="black")
-    
-    
-    
-    fig_ruin
-  }
-
-  
-  
-
-# 2000
-plot_ruin(out_two_loading_indp_2000$V, out_two_loading_indp_2000$theta_1, out_two_loading_indp_2000$theta_2,
-          type = "contour", t1_opt = out_two_loading_indp_2000$t1_opt, t2_opt = out_two_loading_indp_2000$t2_opt, 
-          v_min = round(min(out_two_loading_indp_2000$V[!is.na(out_two_loading_indp_2000$V)]), digits = 2))
-
-plot_profit(out_two_loading_indp_2000$expected_income, 
-            out_two_loading_indp_2000$theta_1,
-            out_two_loading_indp_2000$theta_2,
+plot_profit(out_two_loading_indp_1$expected_income, 
+            out_two_loading_indp_1$theta_1,
+            out_two_loading_indp_1$theta_2,
             type = "contour", 
-            t1_opt = out_two_loading_indp_2000$t1_opt_prof, 
-            t2_opt = out_two_loading_indp_2000$t2_opt_prof,
-            prof_max =  round(max(out_two_loading_indp_2000$expected_income[!is.na(out_two_loading_indp_2000$expected_income)]), digits = 0))
-# 15000
-plot_ruin(out_two_loading_indp_15000$V, out_two_loading_indp_15000$theta_1, out_two_loading_indp_15000$theta_2,
-          type = "contour", t1_opt = out_two_loading_indp_15000$t1_opt, t2_opt = out_two_loading_indp_15000$t2_opt, 
-          v_min = round(min(out_two_loading_indp_15000$V[!is.na(out_two_loading_indp_15000$V)]), digits = 2))
+            t1_opt = out_two_loading_indp_1$t1_opt_prof, 
+            t2_opt = out_two_loading_indp_1$t2_opt_prof,
+            prof_max =  round(max(out_two_loading_indp_1$expected_income[!is.na(out_two_loading_indp_1$expected_income)]), digits = 0))
 
-plot_profit(out_two_loading_indp_15000$expected_income, 
-            out_two_loading_indp_15000$theta_1,
-            out_two_loading_indp_15000$theta_2,
-            type = "contour", 
-            t1_opt = out_two_loading_indp_15000$t1_opt_prof, 
-            t2_opt = out_two_loading_indp_15000$t2_opt_prof,
-            prof_max =  round(max(out_two_loading_indp_15000$expected_income[!is.na(out_two_loading_indp_15000$expected_income)]), digits = 0))
-# 30000
-plot_ruin(out_two_loading_indp_30000$V, out_two_loading_indp_30000$theta_1, out_two_loading_indp_30000$theta_2,
-          type = "contour", t1_opt = out_two_loading_indp_30000$t1_opt, t2_opt = out_two_loading_indp_30000$t2_opt, 
-          v_min = round(min(out_two_loading_indp_30000$V[!is.na(out_two_loading_indp_30000$V)]), digits = 2))
-
-plot_profit(out_two_loading_indp_30000$expected_income, 
-            out_two_loading_indp_30000$theta_1,
-            out_two_loading_indp_30000$theta_2,
-            type = "contour", 
-            t1_opt = out_two_loading_indp_30000$t1_opt_prof, 
-            t2_opt = out_two_loading_indp_30000$t2_opt_prof,
-            prof_max =  round(max(out_two_loading_indp_30000$expected_income[!is.na(out_two_loading_indp_30000$expected_income)]), digits = 0))
 
   
 # Both two  dependent -----
   
-out_two_loading_dep_15000 <-  two_loadings_dep(N = N, r = r, fixed_cost = fixed_cost, lambda = lambda, k = k, beta = beta, 
-                                             x_surplus = 5000, demand = demand, h_x = 100, theta_finess = 0.05,
+out_two_loading_dep_1 <-  two_loadings_dep(N = N, r = r, fixed_cost = fixed_cost, lambda = lambda, k = k, beta = beta, 
+                                             x_surplus = x_surplus[2], demand = demand2var, h_x = 100, theta_finess = 0.05,
                                              f_z_max = 20000, nu = nu)
 
-plot_ruin(out_two_loading_dep_15000$V, out_two_loading_dep_15000$theta_1, out_two_loading_dep_15000$theta_2,
-          type = "contour", t1_opt = out_two_loading_dep_15000$t1_opt, t2_opt = out_two_loading_dep_15000$t2_opt, 
-          v_min = round(min(out_two_loading_dep_15000$V[!is.na(out_two_loading_dep_15000$V)]), digits = 2))
+plot_ruin(out_two_loading_dep_1$V, out_two_loading_dep_1$theta_1, out_two_loading_dep_1$theta_2,
+          type = "contour", t1_opt = out_two_loading_dep_1$t1_opt, t2_opt = out_two_loading_dep_1$t2_opt, 
+          v_min = round(min(out_two_loading_dep_1$V[!is.na(out_two_loading_dep_1$V)]), digits = 2))
 
-plot_profit(out_two_loading_dep_15000$expected_income, 
-            out_two_loading_dep_15000$theta_1_ei,
-            out_two_loading_dep_15000$theta_2_ei,
+plot_profit(out_two_loading_dep_1$expected_income, 
+            out_two_loading_dep_1$theta_1_ei,
+            out_two_loading_dep_1$theta_2_ei,
             type = "contour", 
-            t1_opt = out_two_loading_dep_15000$t1_opt_prof, 
-            t2_opt = out_two_loading_dep_15000$t2_opt_prof,
-            prof_max =  round(max(out_two_loading_dep_15000$expected_income[!is.na(out_two_loading_dep_15000$expected_income)]), digits = 0))
+            t1_opt = out_two_loading_dep_1$t1_opt_prof, 
+            t2_opt = out_two_loading_dep_1$t2_opt_prof,
+            prof_max =  round(max(out_two_loading_dep_1$expected_income[!is.na(out_two_loading_dep_1$expected_income)]), digits = 0))
 
 
 
@@ -456,67 +368,142 @@ plot_profit(out_two_loading_dep_15000$expected_income,
 #save(keep_logit, file = "keep_logit.RData")
 
 
+# Depednent acquisition ----
 
 
-# Test ----
+# Dependent Case Clayton -----
 
-ruin_exp_multi <- function(theta, a, b, r, claim_mean, surplus){
-  
-  
-  lambda <- sum(a)- sum(b*theta)
-  mu <- sum((a-b*theta)*claim_mean)/lambda
-  p <- sum((1+theta)*(a-b*theta)*claim_mean)-sum(r)
-  const <- lambda*mu/(p)
-  R <- (1/mu-lambda/p)
-  
-  ruin <- const*exp(-R*surplus)
-  
-  return(ruin)
+
+
+
+# Gumbel copula -----
+
+gumbel <- function(a,b,cop_par){
+  return(exp(-((-log(a))^cop_par + (-log(b))^cop_par )^(1/cop_par)))
 }
 
 
+cop_params <- 1/(1-kendell)
+clayton_gumbel <- list()
 
 
-surplus <- seq(ffrom = 0, to = 20000, by = 100)
-theta <- 0.4
+for(i in cop_params){
+  print(paste0("copula parameter: ", i))
+  clayton_gumbel[[paste0(i)]] <- list()
+  for(x in c(x_surplus[2])){
+    print(paste0("Surplus: ", x))
+    clayton_gumbel[[paste0(i)]][[paste0(x)]] <- one_loading_inference_clayton(N = N, 
+                                                                              r = r, 
+                                                                              fixed_cost = fixed_cost,
+                                                                              lambda = lambda, 
+                                                                              nu = 1, 
+                                                                              k = k, 
+                                                                              beta = beta,
+                                                                              x_surplus = x,
+                                                                              demand = demand, 
+                                                                              h_x = 100, 
+                                                                              f_z_max = 20000, 
+                                                                              theta_grid = theta_grid,
+                                                                              f_z_limit = 20000,
+                                                                              ord_copula = gumbel,
+                                                                              cop_par = i)
+    
+    
+  }
+  
+}
 
 
-  #l <- N_1*demand_1(thetas_ok[i])*lambda_1/sum(N*demand(thetas_ok[i])*lambda)
-  mean_true <-  1500
-  lambda_true <-  sum(lambda_1*N_1*demand_1(theta))
-  p <-  (1+theta)*sum(N_1*demand_1(theta)*(lambda_1*mean_true-r_1)) - sum(fixed_cost_1)
-  
-  
-  
-  const <- lambda_true*mean_true/(p)
-  R <- (1/mean_true-lambda_true/p)
-  ruin_1 <- const*exp(-R*surplus)
-  
-  
-  
-  l <-  N*demand(theta)*lambda/sum(N*demand(theta)*lambda)
-  lambda_true <-  sum(lambda*N*demand(theta))
-  p <-  (1+theta)*sum(N*demand(theta)*(lambda*mean_true-r)) - sum(fixed_cost)
-  
-  
-  
-  const <- lambda_true*mean_true/(p)
-  R <- (1/mean_true-lambda_true/p)
-  ruin_2 <- const*exp(-R*surplus)
+ruin_values <- list()
 
 
-  plot(surplus, ruin_1, type = "l", ylim = c(0,1))
-  lines(surplus, ruin_2)
+for( i in 1:length(cop_params)){
+  
+  ruin_values[[i]] <-clayton_gumbel[[i]]$`100`$df
+  ruin_values[[i]]$kendell <- as.character(kendell[i])
+  ruin_values[[i]]$cop_param <- cop_params[i]
+  
+}
+
+ruin_values <- as.data.frame(do.call(rbind,ruin_values))
+
+ggplot() + geom_line(aes(x = x, y = value, colour =  kendell), data = ruin_values, size = 1 )+theme_bw(24)+
+  xlab("Loading")+
+  xlab("Loading")+
+  ylab("Probability of Ruin") +
+  ggtitle("Gumbel Acquisition Structure")+
+  labs(colour = "Kendell's tau")
+
+#### Clayton ----
+
+
+clayton <- function(a,b,cop_par){
+  return((a^(-cop_par)+b^(-cop_par)-1)^(-1/cop_par))
+}
+
+
+cop_params <- 2*kendell/(1-kendell)
+clayton_clayton <- list()
+
+
+for(i in cop_params[2]){
+  print(paste0("copula parameter: ", i))
+  clayton_clayton[[paste0(i)]] <- list()
+  for(x in x_surplus[2]){
+    print(paste0("Surplus: ", x))
+    clayton_clayton[[paste0(i)]][[paste0(x)]] <- one_loading_inference_clayton(N = N, 
+                                                                               r = r, 
+                                                                               fixed_cost = fixed_cost,
+                                                                               lambda = lambda, 
+                                                                               nu = 1, 
+                                                                               k = k, 
+                                                                               beta = beta,
+                                                                               x_surplus = x,
+                                                                               demand = demand, 
+                                                                               h_x = 100, 
+                                                                               f_z_max = 20000, 
+                                                                               theta_grid = theta_grid,
+                                                                               f_z_limit = 20000,
+                                                                               ord_copula = clayton,
+                                                                               cop_par = i)
+    
+    
+  }
+  
+}
+
+ruin_values <- list()
+
+
+for( i in 1:length(cop_params)){
   
   
+  ruin_values[[i]] <-clayton_clayton[[i]]$`5000`$df
+  ruin_values[[i]]$kendell <- as.character(kendell[i])
+  ruin_values[[i]]$cop_param <- cop_params[i]
+  
+}
+
+ruin_values <- as.data.frame(do.call(rbind,ruin_values))
+
+ggplot() + geom_line(aes(x = x, y = value, colour =  kendell), data = ruin_values, size = 1 )+theme_bw(24)+
+  xlab("Loading")+
+  xlab("Loading")+
+  ylab("Probability of Ruin") +
+  ggtitle("Clayton Acquisition Structure")+
+  labs(colour = "Kendell's tau")
+
+
+
+
+
 
 # Save ----
   
+
+save.image("./Data_clayton.RData")
   
-   load("min_logit.RData")
-  
-  
-  #save.image("min_logit.RData")
+
 
 
 

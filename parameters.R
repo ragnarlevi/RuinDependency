@@ -5,8 +5,11 @@
 # fixed cost is operation cost
 # r should be 0
 
-# Fix some surplus values
-x_surplus <- c(100, 5000, 15000, 20000)
+# Fix  surplus values
+x_surplus <- c(100, 5000, 15000)
+
+kendell <- c(0.05, 0.1, 0.25, 0.4, 0.65, 0.8)
+theta_grid <- seq(from = 0.15, to = 0.4, by = 0.01)
 
 # Define claims
 N <- c(1, 1)
@@ -42,6 +45,9 @@ demand <- function(theta){
   return(c(demand_1(theta), demand_2(theta)))
 }
 
+demand2var <- function(theta1, theta2){
+  return(c(demand_1(theta1), demand_2(theta2)))
+}
 
 # Probability Inside integral
 S_marginal <-  function(x, shape, scale) 1-pgamma(q = x,shape = shape, scale = scale)

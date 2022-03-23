@@ -13,7 +13,67 @@
 library(progress)
 library(tidyverse)
 
-infnite_survival3 <- function(to, h_x, p, lambda_true, mean_true, f_ = "", S_ = "", print_time = FALSE, lower = 0, ...){
+plot_ruin <- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, v_min = NA ){
+  fig_ruin <- plot_ly(showscale = TRUE,
+                      type = type,
+                      y = ~ t1,
+                      x = ~ t2,
+                      z = ~ V,
+                      colorbar=list(title="Ruin Prob.", 
+                                    tickfont = list(size = 20),
+                                    titlefont = list(size = 24)))
+  
+  fig_ruin <- fig_ruin %>% layout(yaxis = list(title = "&#952;<sub>1</sub>", 
+                                               tickfont = list(size = 22), 
+                                               titlefont = list(size = 24), 
+                                               range = c(0, 0.8)),
+                                  xaxis = list(title = "&#952;<sub>2</sub>", 
+                                               tickfont = list(size = 22), 
+                                               titlefont = list(size = 24),
+                                               range = c(0, 0.8)))
+  
+  
+  text <- paste0("(",t2_opt, ",", t1_opt, ")-> ",v_min, sep ="" )
+  
+  fig_ruin <- fig_ruin %>% colorbar(limits = c(0,1) ) %>%
+    add_annotations(x = t2_opt, y = t1_opt, text = text, font = list(color = "black", 
+                                                                     size = 20), arrowcolor="black")
+  
+  
+  
+  fig_ruin
+}
+
+plot_profit<- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, prof_max = NA ){
+  fig_ruin <- plot_ly(showscale = TRUE,
+                      type = type,
+                      y = ~ t1,
+                      x = ~ t2,
+                      z = ~ V,
+                      colorbar=list(title="Expected Profit", 
+                                    tickfont = list(size = 20), 
+                                    titlefont = list(size = 24)  ) )
+  fig_ruin <- fig_ruin %>% layout(yaxis = list(title = "&#952;<sub>1</sub>", 
+                                               tickfont = list(size = 22),
+                                               titlefont = list(size = 24)),
+                                  xaxis = list(title = "&#952;<sub>2</sub>", 
+                                               tickfont = list(size = 22), 
+                                               titlefont = list(size = 24)))
+  
+  text <- paste0("(",t2_opt, ",", t1_opt, ")-> ", prof_max, sep ="" )
+  
+  fig_ruin <- fig_ruin  %>%
+    add_annotations(x = t2_opt, y = t1_opt, text = text, font = list(color = "black", size = 20),
+                    arrowcolor="black")
+  
+  
+  
+  fig_ruin
+}
+
+
+
+infinite_survival3 <- function(to, h_x, p, lambda_true, mean_true, f_ = "", S_ = "", print_time = FALSE, lower = 0, ...){
   
   
   # We a surplus horzion as computers are finite, we expect v(t,x) -> 0 as x->infinity
@@ -186,7 +246,7 @@ one_loading_inference_indp <- function(N, r, fixed_cost, lambda = rep(1, length(
   
   
   # Ruin probability as function of theta for given surplus
-  
+  print(theta_min)
   df_dep_one <- list()
   thetas_ok <- seq(from = theta_min, to = theta_max, by = theta_finess)
   for(i in 1:length(x_surplus)){
@@ -197,7 +257,7 @@ one_loading_inference_indp <- function(N, r, fixed_cost, lambda = rep(1, length(
 
       
       #vector lambda 
-      l <- N*demand(thetas_ok[i])*lambda/sum(N*demand(thetas_ok[i])*lambda)
+      l <- N*demand(thetas_ok[j])*lambda/sum(N*demand(thetas_ok[j])*lambda)
 
       
       
@@ -224,7 +284,7 @@ one_loading_inference_indp <- function(N, r, fixed_cost, lambda = rep(1, length(
         thetas_to_df[[j]] <- NA
         value_to_df[[j]] <- NA
       }else {
-        out <- infnite_survival3(to = x_surplus[i], 
+        out <- infinite_survival3(to = x_surplus[i], 
                                 h_x = h_x, 
                                 p = p,
                                 lambda_true = lambda_true,
@@ -507,7 +567,7 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
         thetas_to_df[[j]] <- NA
         value_to_df[[j]] <- NA
       }else{
-        out <- infnite_survival3(to = x_surplus[i], 
+        out <- infinite_survival3(to = x_surplus[i], 
                                  h_x = h_x, 
                                  p = p,
                                  lambda_true = lambda_true,
@@ -572,9 +632,9 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
 
 # Assuming only two
 one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, length(N)), nu, k, beta,  x_surplus, demand, 
-                                      h_x = 10, f_z_max = 10000, f_z_limit = f_z_max, ord_copula, theta_grid, cop_par){
+                                      h_x = 10, f_z_max = 10000, f_z_limit = f_z_max, ord_copula, theta_grid, cop_par, verbose = TRUE){
   
-  
+  "Similar to one_loading_inference_dep but can take copula for acquisition"
   
   
   
@@ -781,11 +841,14 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
   
   
   
-  
+  thetas_ok <- theta_grid
   # Ruin probability as function of theta for given surplus
+  if(verbose){
+    pb <- progress_bar$new(format = "  downloading [:bar] :percent eta: :eta",
+                           total = length(x_surplus)*length(thetas_ok))
+  }
   
   df_dep_one <- list()
-  thetas_ok <- theta_grid
   for(i in 1:length(x_surplus)){
     print(i)
     thetas_to_df <- list()
@@ -840,7 +903,7 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
         thetas_to_df[[j]] <- NA
         value_to_df[[j]] <- NA
       }else{
-        out <- infnite_survival3(to = x_surplus[i], 
+        out <- infinite_survival3(to = x_surplus[i], 
                                 h_x = h_x, 
                                 p = p,
                                 lambda_true = lambda_true,
@@ -854,6 +917,10 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
         
         thetas_to_df[[j]] <- thetas_ok[j]
         value_to_df[[j]] <- out$V[length_out] 
+      }
+      
+      if(verbose){
+        pb$tick()
       }
       
     }
@@ -899,7 +966,7 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
 
 
 #' @param claim_mean - claim mean of the individual claims
-two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, claim_mean, demand,  h_x = 10, S_, theta_finess = 0.01, ...){
+two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, claim_mean, demand,  h_x = 10, S_, theta_finess = 0.01, verbose = TRUE, ...){
   
   
   
@@ -918,8 +985,8 @@ two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, cla
   #   }
   
   
-  thetas_1 <- seq(from = 0, to = 1, by = theta_finess )
-  thetas_2 <- seq(from = 0, to = 1, by = theta_finess )
+  thetas_1 <- seq(from = 0, to = 0.5, by = theta_finess )
+  thetas_2 <- seq(from = 0, to = 0.5, by = theta_finess )
   expected_income <- list()
   for(i in 1:length(thetas_1)){
     expected_income[[i]] <- list()
@@ -945,12 +1012,16 @@ two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, cla
   
   expected_income <- do.call(rbind, expected_income)
   
+  if(verbose){
+    pb <- progress_bar$new(format = "  downloading [:bar] :percent eta: :eta",
+                           total = length(thetas_1)*length(thetas_2))
+  }
   
   
   V <- matrix(NA, nrow = length(thetas_1), ncol = length(thetas_2))
   for(i in 1:length(thetas_1)){
     for(j in 1:length(thetas_2)){
-      print(paste0( j + (i-1)*length(thetas_2), " of ", length(thetas_2)*length(thetas_1)))
+      # print(paste0( j + (i-1)*length(thetas_2), " of ", length(thetas_2)*length(thetas_1)))
       
       l <- N*demand(thetas_1[i], thetas_2[j])*lambda/sum(N*demand(thetas_1[i], thetas_2[j])*lambda)
       
@@ -970,7 +1041,7 @@ two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, cla
       }else{
         
         
-        out <- infnite_suvival3(to = x_surplus, 
+        out <- infinite_survival3(to = x_surplus, 
                                 h_x = h_x, 
                                 p = p,
                                 lambda_true = lambda_true,
@@ -978,6 +1049,10 @@ two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, cla
                                 S_ = S_tmp,
                                 ...)
         V[i,j] <- out$V[length(out$V)]  
+      }
+      
+      if(verbose){
+        pb$tick()
       }
       
     }
@@ -1015,7 +1090,7 @@ two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, cla
 
 
 two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, demand,  h_x = 10, 
-                             theta_finess = 0.05, f_z_max = 10000, nu, f_z_limit = f_z_max){
+                             theta_finess = 0.05, f_z_max = 10000, nu, f_z_limit = f_z_max, verbose = TRUE){
   
   
   
@@ -1214,8 +1289,8 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
   
   
   
-  thetas_1 <- seq(from = 0, to = 1, by = 0.01 )
-  thetas_2 <- seq(from = 0, to = 1, by = 0.01 )
+  thetas_1 <- seq(from = 0, to = 0.5, by = 0.01 )
+  thetas_2 <- seq(from = 0, to = 0.5, by = 0.01 )
   expected_income <- list()
   for(i in 1:length(thetas_1)){
     expected_income[[i]] <- list()
@@ -1285,11 +1360,15 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
   
   
   
+  if(verbose){
+    pb <- progress_bar$new(format = "  downloading [:bar] :percent eta: :eta",
+                           total = length(thetas_1)*length(thetas_2))
+  }
   
   V <- matrix(NA, nrow = length(thetas_1), ncol = length(thetas_2))
   for(i in 1:length(thetas_1)){
     for(j in 1:length(thetas_2)){
-      print(paste0( j + (i-1)*length(thetas_2), " of ", length(thetas_2)*length(thetas_1)))
+      # print(paste0( j + (i-1)*length(thetas_2), " of ", length(thetas_2)*length(thetas_1)))
       
       demands <- demand(thetas_1[i], thetas_2[j])
       
@@ -1322,7 +1401,7 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
         V[i,j] <- NA
       }else{
         
-        out <- infnite_suvival3(to = 5000, 
+        out <- infinite_survival3(to = 5000, 
                                 h_x = 500, 
                                 p = p,
                                 lambda_true = lambda_true,
@@ -1331,6 +1410,10 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
                                 l1 = l1, l2 = l2, nu = nu,a = k, b = beta, p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
         
         V[i,j] <- out$V[length(out$V)]  
+      }
+      
+      if(verbose){
+        pb$tick()
       }
       
     }
