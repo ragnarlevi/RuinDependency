@@ -26,11 +26,11 @@ plot_ruin <- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, v_m
   fig_ruin <- fig_ruin %>% layout(yaxis = list(title = "&#952;<sub>1</sub>", 
                                                tickfont = list(size = 22), 
                                                titlefont = list(size = 24), 
-                                               range = c(0, 0.8)),
+                                               range = c(0, 0.7)),
                                   xaxis = list(title = "&#952;<sub>2</sub>", 
                                                tickfont = list(size = 22), 
                                                titlefont = list(size = 24),
-                                               range = c(0, 0.8)))
+                                               range = c(0, 0.7)))
   
   
   text <- paste0("(",t2_opt, ",", t1_opt, ")-> ",v_min, sep ="" )
@@ -985,8 +985,8 @@ two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, cla
   #   }
   
   
-  thetas_1 <- seq(from = 0, to = 0.5, by = theta_finess )
-  thetas_2 <- seq(from = 0, to = 0.5, by = theta_finess )
+  thetas_1 <- seq(from = 0, to = 0.7, by = theta_finess )
+  thetas_2 <- seq(from = 0, to = 0.7, by = theta_finess )
   expected_income <- list()
   for(i in 1:length(thetas_1)){
     expected_income[[i]] <- list()
@@ -1037,7 +1037,7 @@ two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, cla
       p <-  sum((1+c(thetas_1[i], thetas_2[j]))*N*demand(thetas_1[i], thetas_2[j])*(lambda*k*beta-r)) - sum(fixed_cost)
       
       if(p<mean_true*lambda_true){
-        V[i,j] <- NA
+        V[i,j] <- 1
       }else{
         
         
@@ -1351,12 +1351,12 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
   theta_1_ei <- thetas_1
   theta_2_ei <- thetas_2
   
-  thetas_1 <- c(seq(from = 0, to = 0.35, by = 0.05 ), 
-                seq(from = 0.36, to = 0.45, by = 0.01), 
-                seq(from = 0.5, to = 1, by = 0.05 ))
-  thetas_2 <- c(seq(from = 0, to = 0.35, by = 0.05 ), 
-                seq(from = 0.36, to = 0.45, by = 0.01), 
-                seq(from = 0.5, to = 1, by = 0.05 ))
+  thetas_1 <- c(seq(from = 0, to = 029, by = 0.05 ), 
+                seq(from = 0.295, to = 0.35, by = 0.01), 
+                seq(from = 0.355, to = 0.7, by = 0.05 ))
+  thetas_2 <- c(seq(from = 0, to = 029, by = 0.05 ), 
+                seq(from = 0.295, to = 0.35, by = 0.01), 
+                seq(from = 0.355, to = 0.7, by = 0.05 ))
   
   
   
@@ -1397,8 +1397,8 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
       p <-  sum((1+c(thetas_1[i], thetas_2[j]))*N*demand(thetas_1[i], thetas_2[j])*(lambda*k*beta)) - sum(fixed_cost)
       
       
-      if(p<mean_true*lambda_true){
-        V[i,j] <- NA
+      if(p<claim_mean_all*lambda_true){
+        V[i,j] <- 1
       }else{
         
         out <- infinite_survival3(to = 5000, 

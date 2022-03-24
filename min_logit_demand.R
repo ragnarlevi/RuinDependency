@@ -9,6 +9,8 @@ source("utils.R")  # functions
 source("Parameters.R")  # Parameters used in numerical analysis
 
 
+file = "./Data_clayton.RData"
+
 # First Marginal ----
 
 out_1 <- one_loading_inference_indp(N = N[1], 
@@ -163,7 +165,7 @@ out_both_one_dep_1 <- one_loading_inference_dep(N = N,
                                                 f_z_max = 20000, 
                                                 theta_finess = 0.01)
  
-save.image("./Data_clayton.RData")
+save.image(file)
 
 out_both_one_dep_3 <- one_loading_inference_dep(N = N, 
                                                 r = r, 
@@ -178,7 +180,7 @@ out_both_one_dep_3 <- one_loading_inference_dep(N = N,
                                                 f_z_max = 20000, 
                                                 theta_finess = 0.02)
 
-save.image("./Data_clayton.RData")
+save.image(file)
 
 out_both_one_dep_4 <- one_loading_inference_dep(N = N, 
                                                 r = r, 
@@ -193,7 +195,7 @@ out_both_one_dep_4 <- one_loading_inference_dep(N = N,
                                                 f_z_max = 10000, 
                                                 theta_finess = 0.02)
 
-save.image("./Data_clayton.RData")
+save.image(file)
 
 #save(out_both_one_dep_3, file = "dep_3.RData")
 
@@ -316,11 +318,6 @@ gg
 # Both, two, indp, ----  
   
 
-
-S_ <- function(x, a, b){
-  
-  return(c(1-pgamma(q = x , shape = a[1], scale = b[1]), 1-pgamma(q = x , shape = a[2], scale = b[2])))
-}
   
 out_two_loading_indp_1 <-  two_loadings_indep(N = N, r = r, fixed_cost = fixed_cost, lambda = lambda, k = k, beta = beta, 
                                               claim_mean = k*beta, demand = demand2var,
@@ -419,7 +416,7 @@ ruin_values <- list()
 
 for( i in 1:length(cop_params)){
   
-  ruin_values[[i]] <-clayton_gumbel[[i]]$`100`$df
+  ruin_values[[i]] <-clayton_gumbel[[i]]$`5000`$df
   ruin_values[[i]]$kendell <- as.character(kendell[i])
   ruin_values[[i]]$cop_param <- cop_params[i]
   
@@ -446,7 +443,7 @@ cop_params <- 2*kendell/(1-kendell)
 clayton_clayton <- list()
 
 
-for(i in cop_params[2]){
+for(i in cop_params){
   print(paste0("copula parameter: ", i))
   clayton_clayton[[paste0(i)]] <- list()
   for(x in x_surplus[2]){
@@ -501,7 +498,7 @@ ggplot() + geom_line(aes(x = x, y = value, colour =  kendell), data = ruin_value
 # Save ----
   
 
-save.image("./Data_clayton.RData")
+save.image(file)
   
 
 
