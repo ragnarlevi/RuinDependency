@@ -13,13 +13,13 @@ theta_grid <- seq(from = 0.15, to = 0.4, by = 0.01)
 
 # Define claims
 N <- c(1, 1)
-k <- c(2, 6)
+k <- c(2, 16)
 beta <- c(500, 500)
-lambda <- c(0.08, 0.03)
+lambda <- c(0.08, 0.01)
 fixed_cost <-   0.1*k*beta*N*lambda*0.3 # Cost is 20% of a 30% market share
 r <- c(0,0) 
 
-nu <- 1
+nu <- 0.5
 
 
 

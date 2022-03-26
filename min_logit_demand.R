@@ -3,13 +3,15 @@ library(ggnewscale) # add new color scale -> new_scale_color
 # Set color brewer
 library(RColorBrewer)
 library(plotly)
+library(progress)
 
 
 source("utils.R")  # functions
 source("Parameters.R")  # Parameters used in numerical analysis
 
 
-file = "./Data_clayton.RData"
+file = "./Data_clayton_05.RData"
+print(nu)
 
 # First Marginal ----
 
@@ -21,7 +23,7 @@ out_1 <- one_loading_inference_indp(N = N[1],
                                     claim_mean = k[1]*beta[1],
                                     x_surplus = x_surplus, 
                                     demand = demand_1, 
-                                    theta_finess = 0.01,
+                                    theta_finess = 0.001,
                                     S_ = S_marginal, 
                                     shape = k[1], 
                                     scale = beta[1])
@@ -58,7 +60,7 @@ out_2 <- one_loading_inference_indp(N = N[2],
                                     lambda = lambda[2], 
                                     h_x = 100,
                                     claim_mean = k[2]*beta[2], 
-                                    theta_finess = 0.005,
+                                    theta_finess = 0.001,
                                     x_surplus = x_surplus, 
                                     demand = demand_2, 
                                     S_ = S_marginal, 
@@ -99,7 +101,7 @@ out_one_indp <- one_loading_inference_indp(N = N,
                                            demand = demand, 
                                            h_x = 100,
                                            x_surplus = x_surplus,
-                                           theta_finess = 0.005,
+                                           theta_finess = 0.001,
                                            S_ = S_, 
                                            a = k, 
                                            b = beta)
@@ -135,7 +137,6 @@ out_one_indp$opt_ruin_theta
 # Joint with Levy copula dependence ----
 # These take some time to calculate, The higher the surplus, the higher the complexity.
 
-
   
 out_both_one_dep_1 <- one_loading_inference_dep(N = N, 
                                               r = r, 
@@ -151,7 +152,7 @@ out_both_one_dep_1 <- one_loading_inference_dep(N = N,
                                               theta_finess = 0.01,
                                               f_z_limit = 20000)
 
-
+save.image(file)
  out_both_one_dep_2 <- one_loading_inference_dep(N = N, 
                                                 r = r, 
                                                 fixed_cost = fixed_cost, 
@@ -178,24 +179,11 @@ out_both_one_dep_3 <- one_loading_inference_dep(N = N,
                                                 demand = demand, 
                                                 h_x = 100, 
                                                 f_z_max = 20000, 
-                                                theta_finess = 0.02)
+                                                theta_finess = 0.01)
 
 save.image(file)
 
-out_both_one_dep_4 <- one_loading_inference_dep(N = N, 
-                                                r = r, 
-                                                fixed_cost = fixed_cost, 
-                                                lambda = lambda, 
-                                                nu = nu, 
-                                                k = k, 
-                                                beta = beta,
-                                                x_surplus = 20000,
-                                                demand = demand, 
-                                                h_x = 500, 
-                                                f_z_max = 10000, 
-                                                theta_finess = 0.02)
 
-save.image(file)
 
 #save(out_both_one_dep_3, file = "dep_3.RData")
 
@@ -325,7 +313,7 @@ out_two_loading_indp_1 <-  two_loadings_indep(N = N, r = r, fixed_cost = fixed_c
   
   
   
- 
+save.image(file)
   
 plot_ruin(out_two_loading_indp_1$V, out_two_loading_indp_1$theta_1, out_two_loading_indp_1$theta_2,
           type = "contour", t1_opt = out_two_loading_indp_1$t1_opt, t2_opt = out_two_loading_indp_1$t2_opt, 
@@ -359,7 +347,7 @@ plot_profit(out_two_loading_dep_1$expected_income,
             t2_opt = out_two_loading_dep_1$t2_opt_prof,
             prof_max =  round(max(out_two_loading_dep_1$expected_income[!is.na(out_two_loading_dep_1$expected_income)]), digits = 0))
 
-
+save.image(file)
 
 #keep_logit <- out_1
 #save(keep_logit, file = "keep_logit.RData")
@@ -404,6 +392,7 @@ for(i in cop_params){
                                                                               f_z_limit = 20000,
                                                                               ord_copula = gumbel,
                                                                               cop_par = i)
+    save.image(file)
     
     
   }
@@ -412,7 +401,7 @@ for(i in cop_params){
 
 
 ruin_values <- list()
-
+save.image(file)
 
 for( i in 1:length(cop_params)){
   
@@ -463,6 +452,7 @@ for(i in cop_params){
                                                                                f_z_limit = 20000,
                                                                                ord_copula = clayton,
                                                                                cop_par = i)
+    save.image(file)
     
     
   }
