@@ -663,9 +663,14 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
       return((1+nu)*(u1^(-nu)+u2^(-nu))^(-1/nu - 2)*(u1^(-nu-1)*u2^(-nu-1)))
     }
     
-    return(l1*l2*dgamma(x = x1, shape = a[1], scale = b[1])*dgamma(x = x2, shape = a[2], scale = b[2])*
-             copula_density(u1 = l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])), 
-                            u2 = l2*(1-pgamma(q = x2, shape = a[2], scale = b[2])), nu)/l_common)
+    val <- l1*l2*dgamma(x = x1, shape = a[1], scale = b[1])*dgamma(x = x2, shape = a[2], scale = b[2])*
+      copula_density(u1 = l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])), 
+                     u2 = l2*(1-pgamma(q = x2, shape = a[2], scale = b[2])), nu)/l_common
+    
+    val[is.nan(val)] <- 0
+
+    
+    return(val)
     
   }
   
@@ -689,8 +694,10 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
   f_indp_perp <- Vectorize(f_indp_perp, vectorize.args = "x")
   # density of the sum of common jumps is
   f_z <- function(z, a,b, nu, l1, l2, l_common){
-    # print(z)  
-    int_function <- function(x) f_bivariate(x, z-x, nu = nu, a = a, b = b, l1, l2, l_common)
+    int_function <- function(x){
+      val <- f_bivariate(x, z-x, nu = nu, a = a, b = b, l1, l2, l_common)
+      
+      }
     
     if(f_z_limit<z){
       return(0)
@@ -718,7 +725,7 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
   #integrate(f_1perp, lower = 0, upper = 100, l1 = 3, l2 = 4, a = 2, b = 5, nu = 0.2)
   
   
-  f_combined <- function(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 = p_1*p_2){
+  f_combined <- function(x, l1, l2, nu, a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 = p_1*p_2){
     
     l_common <- clayton_copula(l1,l2,nu)
     l1_perp <- l1 - l_common
@@ -727,11 +734,15 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
     l_tilde <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1_2)*l_common
     
     
-    p_1*l1_perp*f_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
+    val <- p_1*l1_perp*f_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
       p_2*l2_perp*f_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/l_tilde +
       p_1_0*l_common*f_1perp(x = x, l1 = l1, l2 = l2, a = a[1], b = b[1], nu = nu)/l_tilde +
       p_0_2*l_common*f_1perp(x = x, l1 = l2, l2 = l1, a = a[2], b = b[2], nu = nu)/l_tilde +
       p_1_2*l_common*f_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )/l_tilde
+    # print(val)
+    
+    val[is.nan(val)] <- 0
+    val
     
     
     
@@ -796,10 +807,9 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
     # if(p_1_0 != demands[1]*(1-demands[2])) print(thetas[i])
     # if(p_0_2 != demands[2]*(1-demands[1])) warning("p_0_2 not same as indp")
     # if(p_1_2 != demands[1]*demands[2]) warning("p_1_2 not same as indp")
-
     sum_to_one <- integrate(f_combined,lower = 0, upper = f_z_max, 
                             l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
-                            p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, p_1_2 = p_1_2)$value
+                            p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, p_1_2 = p_1_2,subdivisions = 2000)$value
     
     
     
@@ -901,7 +911,7 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
       if(p<=mean_true*lambda_true){
         warning(paste0("Ruin will happen ", thetas_ok[j]))
         thetas_to_df[[j]] <- NA
-        value_to_df[[j]] <- NA
+        value_to_df[[j]] <- 1
       }else{
         out <- infinite_survival3(to = x_surplus[i], 
                                 h_x = h_x, 

@@ -36,7 +36,7 @@ demand_1 <- function(theta){
 #' @param b2 - logit parameter loading slope
 demand_2 <- function(theta){
   b1 <- log((1-0.3)/0.3) - 1/(1-0.3)
-  b2 <- 1/(0.22*(1-0.3))
+  b2 <- 1/(0.2*(1-0.3))
   
   1/(1+exp(b1+b2*theta))
 }

@@ -441,15 +441,15 @@ for(i in cop_params){
                                                                                r = r, 
                                                                                fixed_cost = fixed_cost,
                                                                                lambda = lambda, 
-                                                                               nu = 1, 
+                                                                               nu = nu, 
                                                                                k = k, 
                                                                                beta = beta,
                                                                                x_surplus = x,
                                                                                demand = demand, 
                                                                                h_x = 100, 
-                                                                               f_z_max = 20000, 
+                                                                               f_z_max = 21000, 
                                                                                theta_grid = theta_grid,
-                                                                               f_z_limit = 20000,
+                                                                               f_z_limit = 21000,
                                                                                ord_copula = clayton,
                                                                                cop_par = i)
     save.image(file)
