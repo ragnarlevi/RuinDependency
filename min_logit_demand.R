@@ -7,10 +7,10 @@ library(progress)
 
 
 source("utils.R")  # functions
-source("Parameters.R")  # Parameters used in numerical analysis
+source("parameters.R")  # Parameters used in numerical analysis
 
 
-file = "./Data_clayton_05.RData"
+file = "./Data_clayton_8.RData"
 print(nu)
 
 # First Marginal ----
@@ -164,7 +164,7 @@ save.image(file)
                                                 demand = demand, 
                                                 h_x = 100, 
                                                 f_z_max = 20000, 
-                                                theta_finess = 0.01)
+                                                theta_finess = 0.05)
  
 save.image(file)
 
@@ -179,7 +179,7 @@ out_both_one_dep_3 <- one_loading_inference_dep(N = N,
                                                 demand = demand, 
                                                 h_x = 100, 
                                                 f_z_max = 20000, 
-                                                theta_finess = 0.01)
+                                                theta_finess = 0.05)
 
 save.image(file)
 
@@ -331,23 +331,23 @@ plot_profit(out_two_loading_indp_1$expected_income,
   
 # Both two  dependent -----
   
-out_two_loading_dep_1 <-  two_loadings_dep(N = N, r = r, fixed_cost = fixed_cost, lambda = lambda, k = k, beta = beta, 
-                                             x_surplus = x_surplus[2], demand = demand2var, h_x = 100, theta_finess = 0.05,
-                                             f_z_max = 20000, nu = nu)
-
-plot_ruin(out_two_loading_dep_1$V, out_two_loading_dep_1$theta_1, out_two_loading_dep_1$theta_2,
-          type = "contour", t1_opt = out_two_loading_dep_1$t1_opt, t2_opt = out_two_loading_dep_1$t2_opt, 
-          v_min = round(min(out_two_loading_dep_1$V[!is.na(out_two_loading_dep_1$V)]), digits = 2))
-
-plot_profit(out_two_loading_dep_1$expected_income, 
-            out_two_loading_dep_1$theta_1_ei,
-            out_two_loading_dep_1$theta_2_ei,
-            type = "contour", 
-            t1_opt = out_two_loading_dep_1$t1_opt_prof, 
-            t2_opt = out_two_loading_dep_1$t2_opt_prof,
-            prof_max =  round(max(out_two_loading_dep_1$expected_income[!is.na(out_two_loading_dep_1$expected_income)]), digits = 0))
-
-save.image(file)
+# out_two_loading_dep_1 <-  two_loadings_dep(N = N, r = r, fixed_cost = fixed_cost, lambda = lambda, k = k, beta = beta, 
+#                                              x_surplus = x_surplus[2], demand = demand2var, h_x = 100, theta_finess = 0.05,
+#                                              f_z_max = 20000, nu = nu)
+# 
+# plot_ruin(out_two_loading_dep_1$V, out_two_loading_dep_1$theta_1, out_two_loading_dep_1$theta_2,
+#           type = "contour", t1_opt = out_two_loading_dep_1$t1_opt, t2_opt = out_two_loading_dep_1$t2_opt, 
+#           v_min = round(min(out_two_loading_dep_1$V[!is.na(out_two_loading_dep_1$V)]), digits = 2))
+# 
+# plot_profit(out_two_loading_dep_1$expected_income, 
+#             out_two_loading_dep_1$theta_1_ei,
+#             out_two_loading_dep_1$theta_2_ei,
+#             type = "contour", 
+#             t1_opt = out_two_loading_dep_1$t1_opt_prof, 
+#             t2_opt = out_two_loading_dep_1$t2_opt_prof,
+#             prof_max =  round(max(out_two_loading_dep_1$expected_income[!is.na(out_two_loading_dep_1$expected_income)]), digits = 0))
+# 
+# save.image(file)
 
 #keep_logit <- out_1
 #save(keep_logit, file = "keep_logit.RData")
@@ -387,9 +387,9 @@ for(i in cop_params){
                                                                               x_surplus = x,
                                                                               demand = demand, 
                                                                               h_x = 50, 
-                                                                              f_z_max = 28000, 
+                                                                              f_z_max = 21000, 
                                                                               theta_grid = theta_grid,
-                                                                              f_z_limit = 28000,
+                                                                              f_z_limit = 21000,
                                                                               ord_copula = gumbel,
                                                                               cop_par = i)
     save.image(file)

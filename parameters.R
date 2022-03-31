@@ -19,7 +19,7 @@ lambda <- c(0.08, 0.01)
 fixed_cost <-   0.1*k*beta*N*lambda*0.3 # Cost is 20% of a 30% market share
 r <- c(0,0) 
 
-nu <- 0.5
+nu <- 8
 
 
 

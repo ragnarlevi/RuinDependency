@@ -97,19 +97,19 @@ infinite_survival3 <- function(to, h_x, p, lambda_true, mean_true, f_ = "", S_ =
   
   if(is.character(S_)){
     S_ <- function(x,...){
-      1-integrate(f_, lower = lower, upper = x, ...)$value
+      1-integrate(f_, lower = lower, upper = x, subdivisions = 5000, ...)$value
     }
     S_ <- Vectorize(S_, vectorize.args = "x")
   }
   
   
   S_bar <- function(x,...){
-    integrate(S_, lower = lower, upper = x, ...)$value
+    integrate(S_, lower = lower, upper = x, subdivisions = 5000, ...)$value
   }
   S_bar <- Vectorize(S_bar, vectorize.args = "x")
   
   S_2bar <- function(x,...){
-    integrate(S_bar, lower = lower, upper = x, ...)$value
+    integrate(S_bar, lower = lower, upper = x, subdivisions = 5000, ...)$value
   }
   S_2bar <- Vectorize(S_2bar, vectorize.args = "x")
   
@@ -375,9 +375,12 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
       return((1+nu)*(u1^(-nu)+u2^(-nu))^(-1/nu - 2)*(u1^(-nu-1)*u2^(-nu-1)))
     }
     
-    return(l1*l2*dgamma(x = x1, shape = a[1], scale = b[1])*dgamma(x = x2, shape = a[2], scale = b[2])*
-             copula_density(u1 = l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])), 
-                            u2 = l2*(1-pgamma(q = x2, shape = a[2], scale = b[2])), nu)/l_common)
+    val <- l1*l2*dgamma(x = x1, shape = a[1], scale = b[1])*dgamma(x = x2, shape = a[2], scale = b[2])*
+      copula_density(u1 = l1*(1-pgamma(q = x1, shape = a[1], scale = b[1]) + 0.0001), 
+                     u2 = l2*(1-pgamma(q = x2, shape = a[2], scale = b[2]) + 0.0001), nu)/l_common
+    # val[is.nan(val)] <- 0
+    
+    return(val)
     
   }
   
@@ -400,19 +403,17 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
   
   f_indp_perp <- Vectorize(f_indp_perp, vectorize.args = "x")
   # density of the sum of common jumps is
+
+  
+  
   f_z <- function(z, a,b, nu, l1, l2, l_common){
-    # print(z)  
-    int_function <- function(x) f_bivariate(x, z-x, nu = nu, a = a, b = b, l1, l2, l_common)
-    
-    if(f_z_limit<z){
-      return(0)
-    }else{
-      return(integrate(int_function, lower = 0, upper = z)$value) 
-    }
+    sum(unlist(sapply(seq(from= 0, to =  z, by = 100), function(x, z){
+      f_bivariate(x,z-x, nu, a, b, l1, l2, l_common)}, z=z) ))*100
   }
+  
   f_z <- Vectorize(f_z, vectorize.args = "z")
   
-  
+
   # Density of the marginal common jump
   f_1perp <- function(x, l1, l2, a,b, nu){
     
@@ -436,11 +437,13 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
     l_tilde <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
     
     
-    p_1*l1_perp*f_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
+    val <- p_1*l1_perp*f_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
       p_2*l2_perp*f_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/l_tilde +
       p_1_0*l_common*f_1perp(x = x, l1 = l1, l2 = l2, a = a[1], b = b[1], nu = nu)/l_tilde +
       p_0_2*l_common*f_1perp(x = x, l1 = l2, l2 = l1, a = a[2], b = b[2], nu = nu)/l_tilde +
       p_1*p_2*l_common*f_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )/l_tilde
+    val[is.nan(val)] <- 0
+    val
     
     
   }
@@ -458,6 +461,12 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
   thetas <- seq(from = 0, to = 2, by = 0.01)
   # if demand returns a vector then doing vector thingy can lear to some errors
   expected_income <- list()
+  
+  if(verbose){
+    pb <- progress_bar$new(format = "  downloading [:bar] :percent eta: :eta",
+                           total = length(x_surplus)*length(thetas))
+  }
+  
   for( i in 1:length(thetas)){
     demands <- demand(thetas[i])
     #l1 <- N[1]*demands[1]*lambda[1]
@@ -479,12 +488,13 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
     
     sum_to_one <- integrate(f_combined,lower = 0, upper = f_z_max, 
                             l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
-                            p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)$value
+                            p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, 
+                            subdivisions = 5000)$value
     
     
     
     
-    if(sum_to_one <0.9999){
+    if(sum_to_one <0.999){
       stop(paste0("f_z sum is ", sum_to_one))
     }
     
@@ -492,10 +502,15 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
     
     claim_mean_all <- integrate(mean_func, lower = 0, upper = f_z_max, 
                                 l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
-                                p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)$value
+                                p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2,
+                                subdivisions = 5000)$value
     
     expected_income[[i]] <- (1+thetas[i])*sum(c(l1*demands[1], l2*demands[2])*k*beta ) - sum(fixed_cost) - claim_mean_all*l_all
-    
+   
+    if(verbose){
+      pb$tick()
+    }
+     
   }
   
   print("Expected profit done.")
@@ -557,7 +572,8 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
       
       mean_true <-  integrate(mean_func, lower = 0, upper = f_z_max, 
                               l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
-                              p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)$value
+                              p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, 
+                              subdivisions = 5000)$value
       # print("mean_true calculated")
       lambda_true <-  l_all
       p <-  (1+thetas_ok[j])*sum(c(l1*demands[1], l2*demands[2])*k*beta ) - sum(fixed_cost)
@@ -694,19 +710,12 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
   f_indp_perp <- Vectorize(f_indp_perp, vectorize.args = "x")
   # density of the sum of common jumps is
   f_z <- function(z, a,b, nu, l1, l2, l_common){
-    int_function <- function(x){
-      val <- f_bivariate(x, z-x, nu = nu, a = a, b = b, l1, l2, l_common)
-      
-      }
-    
-    if(f_z_limit<z){
-      return(0)
-    }else{
-      return(integrate(int_function, lower = 0, upper = z)$value) 
-    }
+    sum(unlist(sapply(seq(from= 0, to =  z, by = 500), function(x, z){
+      f_bivariate(x,z-x, nu, a, b, l1, l2, l_common)}, z=z) ))*500
   }
   
   f_z <- Vectorize(f_z, vectorize.args = "z")
+
   
   
   # Density of the marginal common jump
@@ -809,12 +818,13 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
     # if(p_1_2 != demands[1]*demands[2]) warning("p_1_2 not same as indp")
     sum_to_one <- integrate(f_combined,lower = 0, upper = f_z_max, 
                             l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
-                            p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, p_1_2 = p_1_2,subdivisions = 2000)$value
+                            p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, p_1_2 = p_1_2,
+                            subdivisions = 5000)$value
     
     
     
     
-    if(sum_to_one <0.9999){
+    if(sum_to_one <0.999){
       stop(paste0("f_z sum is ", sum_to_one))
     }
     
@@ -822,7 +832,8 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
     
     claim_mean_all <- integrate(mean_func, lower = 0, upper = f_z_max, 
                                 l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
-                                p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, p_1_2 = p_1_2)$value
+                                p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, 
+                                p_1_2 = p_1_2, subdivisions = 5000)$value
     
     expected_income[[i]] <- (1+thetas[i])*sum(c(l1*demands[1], l2*demands[2])*k*beta ) - sum(fixed_cost) - claim_mean_all*l_all
    
@@ -903,7 +914,8 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
       
       mean_true <-  integrate(mean_func, lower = 0, upper = f_z_max, 
                               l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
-                              p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, p_1_2 = p_1_2)$value
+                              p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2,
+                              p_1_2 = p_1_2, subdivisions = 5000)$value
      # print("mean_true calculated")
       lambda_true <-  l_all
       p <-  (1+thetas_ok[j])*sum(c(l1*demands[1], l2*demands[2])*k*beta ) - sum(fixed_cost)
@@ -1154,9 +1166,13 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
       return((1+nu)*(u1^(-nu)+u2^(-nu))^(-1/nu - 2)*(u1^(-nu-1)*u2^(-nu-1)))
     }
     
-    return(l1*l2*dgamma(x = x1, shape = a[1], scale = b[1])*dgamma(x = x2, shape = a[2], scale = b[2])*
-             copula_density(u1 = l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])), 
-                            u2 = l2*(1-pgamma(q = x2, shape = a[2], scale = b[2])), nu)/l_common)
+    val <- l1*l2*dgamma(x = x1, shape = a[1], scale = b[1])*dgamma(x = x2, shape = a[2], scale = b[2])*
+      copula_density(u1 = l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])), 
+                     u2 = l2*(1-pgamma(q = x2, shape = a[2], scale = b[2])), nu)/l_common
+    
+    val[is.nan(val)] <- 0
+    
+    return(val)
     
   }
   
@@ -1180,14 +1196,8 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
   f_indp_perp <- Vectorize(f_indp_perp, vectorize.args = "x")
   # density of the sum of common jumps is
   f_z <- function(z, a,b, nu, l1, l2, l_common){
-    # print(z)  
-    int_function <- function(x) f_bivariate(x, z-x, nu = nu, a = a, b = b, l1, l2, l_common)
-    
-    if(f_z_limit<z){
-      return(0)
-    }else{
-      return(integrate(int_function, lower = 0, upper = z)$value) 
-    }
+    sum(unlist(sapply(seq(from= 0, to =  z, by = 100), function(x, z){
+      f_bivariate(x,z-x, nu, a, b, l1, l2, l_common)}, z=z) ))*100
   }
   
   f_z <- Vectorize(f_z, vectorize.args = "z")
@@ -1206,7 +1216,7 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
   
   f_1perp <- Vectorize(f_1perp, vectorize.args = "x")
   
-  integrate(f_1perp, lower = 0, upper = 100, l1 = 3, l2 = 4, a = 2, b = 5, nu = 0.2)
+ #  integrate(f_1perp, lower = 0, upper = 100, l1 = 3, l2 = 4, a = 2, b = 5, nu = 0.2)
   
   # 
   # f_indp_perp_tilde_1 <- function(x, p_1, p_1_0, a,b, nu, l1, l2, l_common){
@@ -1272,11 +1282,14 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
     l_tilde <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
     
     
-    p_1*l1_perp*f_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
+    val <- p_1*l1_perp*f_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
       p_2*l2_perp*f_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/l_tilde +
       p_1_0*l_common*f_1perp(x = x, l1 = l1, l2 = l2, a = a[1], b = b[1], nu = nu)/l_tilde +
       p_0_2*l_common*f_1perp(x = x, l1 = l2, l2 = l1, a = a[2], b = b[2], nu = nu)/l_tilde +
       p_1*p_2*l_common*f_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )/l_tilde
+    
+    val[is.nan(val)] <- 0
+    val
     
     # p_1*l1_perp/l_tilde + 
     #   p_2*l2_perp/l_tilde +
@@ -1348,7 +1361,8 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
       
       claim_mean_all <- integrate(mean_func, lower = 0, upper = f_z_max, 
                                   l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
-                                  p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)$value
+                                  p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, 
+                                  p_0_2 = p_0_2, subdivisions = 5000)$value
       
       
       
@@ -1400,7 +1414,8 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
       
       claim_mean_all <- integrate(mean_func, lower = 0, upper = f_z_max, 
                                   l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
-                                  p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)$value
+                                  p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, 
+                                  subdivisions = 5000)$value
       
       
       lambda_true <-  l_all
