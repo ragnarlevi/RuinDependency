@@ -8,7 +8,7 @@
 # Fix  surplus values
 x_surplus <- c(100, 5000, 15000)
 
-kendell <- c(0.05, 0.1, 0.25, 0.4, 0.65, 0.8)
+kendell <- c(0.05, 0.15,  0.4,  0.8)
 theta_grid <- seq(from = 0.15, to = 0.4, by = 0.01)
 
 # Define claims

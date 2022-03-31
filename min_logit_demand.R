@@ -10,7 +10,7 @@ source("utils.R")  # functions
 source("parameters.R")  # Parameters used in numerical analysis
 
 
-file = "./Data_clayton_8.RData"
+file = "./Data_clayton_8_different_loadings.RData"
 print(nu)
 
 # First Marginal ----
