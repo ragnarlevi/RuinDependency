@@ -23,6 +23,7 @@ nu <- 4
 
 
 
+
 #' @param b1 - logit parameter intercept
 #' @param b2 - logit parameter loading slope
 demand_1 <- function(theta){
