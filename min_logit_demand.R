@@ -10,15 +10,15 @@ source("utils.R")  # functions
 source("parameters.R")  # Parameters used in numerical analysis
 
 
-file = "./Data_clayton_8_different_loadings.RData"
+file = "./Data_clayton_05_same_loadings_new.RData"
 print(nu)
-
+h_x <- 0.5
 # First Marginal ----
 
 out_1 <- one_loading_inference_indp(N = N[1], 
                                     r = r[1], 
                                     fixed_cost = fixed_cost[1],
-                                    h_x = 100,
+                                    h_x = h_x,
                                     lambda = lambda[1], 
                                     claim_mean = k[1]*beta[1],
                                     x_surplus = x_surplus, 
@@ -58,7 +58,7 @@ out_2 <- one_loading_inference_indp(N = N[2],
                                     r = r[2], 
                                     fixed_cost = fixed_cost[2],
                                     lambda = lambda[2], 
-                                    h_x = 100,
+                                    h_x = h_x,
                                     claim_mean = k[2]*beta[2], 
                                     theta_finess = 0.001,
                                     x_surplus = x_surplus, 
@@ -99,7 +99,7 @@ out_one_indp <- one_loading_inference_indp(N = N,
                                            lambda = lambda, 
                                            claim_mean = k*beta,
                                            demand = demand, 
-                                           h_x = 100,
+                                           h_x = h_x,
                                            x_surplus = x_surplus,
                                            theta_finess = 0.001,
                                            S_ = S_, 
@@ -147,7 +147,7 @@ out_both_one_dep_1 <- one_loading_inference_dep(N = N,
                                               beta = beta,
                                               x_surplus = x_surplus[1],
                                               demand = demand, 
-                                              h_x = 100, 
+                                              h_x = h_x, 
                                               f_z_max = 20000, 
                                               theta_finess = 0.01,
                                               f_z_limit = 20000)
@@ -162,7 +162,7 @@ save.image(file)
                                                 beta = beta,
                                                 x_surplus = x_surplus[2],
                                                 demand = demand, 
-                                                h_x = 100, 
+                                                h_x = h_x, 
                                                 f_z_max = 20000, 
                                                 theta_finess = 0.05)
  
@@ -177,7 +177,7 @@ out_both_one_dep_3 <- one_loading_inference_dep(N = N,
                                                 beta = beta,
                                                 x_surplus = x_surplus[3],
                                                 demand = demand, 
-                                                h_x = 100, 
+                                                h_x = h_x, 
                                                 f_z_max = 20000, 
                                                 theta_finess = 0.05)
 
@@ -309,7 +309,7 @@ gg
   
 out_two_loading_indp_1 <-  two_loadings_indep(N = N, r = r, fixed_cost = fixed_cost, lambda = lambda, k = k, beta = beta, 
                                               claim_mean = k*beta, demand = demand2var,
-                                               x_surplus = x_surplus[2], h_x = 100, S_ = S_, a = k, b = beta)
+                                               x_surplus = x_surplus[2], h_x = 0.5, S_ = S_, a = k, b = beta)
   
   
   
@@ -386,7 +386,7 @@ for(i in cop_params){
                                                                               beta = beta,
                                                                               x_surplus = x,
                                                                               demand = demand, 
-                                                                              h_x = 50, 
+                                                                              h_x = h_x, 
                                                                               f_z_max = 21000, 
                                                                               theta_grid = theta_grid,
                                                                               f_z_limit = 21000,
@@ -446,7 +446,7 @@ for(i in cop_params){
                                                                                beta = beta,
                                                                                x_surplus = x,
                                                                                demand = demand, 
-                                                                               h_x = 100, 
+                                                                               h_x = h_x, 
                                                                                f_z_max = 21000, 
                                                                                theta_grid = theta_grid,
                                                                                f_z_limit = 21000,

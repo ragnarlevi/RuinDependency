@@ -6,28 +6,29 @@
 # r should be 0
 
 # Fix  surplus values
-x_surplus <- c(100, 5000, 15000)
+x_surplus <- c(2, 10, 20)
 
 kendell <- c(0.05, 0.15,  0.4,  0.8)
 theta_grid <- seq(from = 0.15, to = 0.4, by = 0.01)
 
 # Define claims
 N <- c(1, 1)
-k <- c(2, 16)
-beta <- c(500, 500)
-lambda <- c(0.08, 0.01)
-fixed_cost <-   0.1*k*beta*N*lambda*0.3 # Cost is 20% of a 30% market share
+k <- c(1, 2)
+beta <- c(1, 3/2)
+lambda <- c(10000, 10000/3)
+fixed_cost <-   c(1000/3, 1000/3)
 r <- c(0,0) 
 
-nu <- 1
-
+nu <- 0.5
 
 
 #' @param b1 - logit parameter intercept
 #' @param b2 - logit parameter loading slope
 demand_1 <- function(theta){
-  b1 <- log((1-0.3)/0.3) - 1/(1-0.3)
-  b2 <- 1/(0.2*(1-0.3))
+  p <- 1/3
+  tt <- 1/5
+  b1 <- log((1-p)/p) - 1/(1-p)
+  b2 <- 1/(tt*(1-p))
   
   1/(1+exp(b1+b2*theta))
 }
@@ -35,8 +36,10 @@ demand_1 <- function(theta){
 #' @param b1 - logit parameter intercept
 #' @param b2 - logit parameter loading slope
 demand_2 <- function(theta){
-  b1 <- log((1-0.3)/0.3) - 1/(1-0.3)
-  b2 <- 1/(0.2*(1-0.3))
+  p <- 1/3
+  tt <- 1/5
+  b1 <- log((1-p)/p) - 1/(1-p)
+  b2 <- 1/(tt*(1-p))
   
   1/(1+exp(b1+b2*theta))
 }

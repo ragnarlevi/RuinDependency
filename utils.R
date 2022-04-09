@@ -250,7 +250,6 @@ one_loading_inference_indp <- function(N, r, fixed_cost, lambda = rep(1, length(
   df_dep_one <- list()
   thetas_ok <- seq(from = theta_min, to = theta_max, by = theta_finess)
   for(i in 1:length(x_surplus)){
-    print(i)
     thetas_to_df <- list()
     value_to_df <- list()
     for(j in 1:length(thetas_ok)){
@@ -258,7 +257,6 @@ one_loading_inference_indp <- function(N, r, fixed_cost, lambda = rep(1, length(
       
       #vector lambda 
       l <- N*demand(thetas_ok[j])*lambda/sum(N*demand(thetas_ok[j])*lambda)
-
       
       
       # The survival distribution is a sum
