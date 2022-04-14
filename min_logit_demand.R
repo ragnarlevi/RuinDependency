@@ -391,13 +391,13 @@ gumbel <- function(a,b,cop_par){
 cop_params <- 1/(1-kendell)
 clayton_gumbel <- list()
 
-
+source("utils.R")
 for(i in cop_params){
   print(paste0("copula parameter: ", i))
   clayton_gumbel[[paste0(i)]] <- list()
   for(x in c(x_surplus[2])){
     print(paste0("Surplus: ", x))
-    clayton_gumbel[[paste0(i)]][[paste0(x)]] <- one_loading_inference_clayton(N = N, 
+    clayton_gumbel[[paste0(i)]][[paste0(x)]] <- one_loading_inference_clayton2(N = N, 
                                                                               r = r, 
                                                                               fixed_cost = fixed_cost,
                                                                               lambda = lambda, 
@@ -408,7 +408,7 @@ for(i in cop_params){
                                                                               demand = demand, 
                                                                               h_x = h_x, 
                                                                               f_z_max = 30, 
-                                                                              theta_grid = theta_grid,
+                                                                              theta_grid = theta_grid_ruin,
                                                                               f_z_limit = 30,
                                                                               ord_copula = gumbel,
                                                                               cop_par = i)
@@ -458,7 +458,7 @@ for(i in cop_params){
   clayton_clayton[[paste0(i)]] <- list()
   for(x in x_surplus[2]){
     print(paste0("Surplus: ", x))
-    clayton_clayton[[paste0(i)]][[paste0(x)]] <- one_loading_inference_clayton(N = N, 
+    clayton_clayton[[paste0(i)]][[paste0(x)]] <- one_loading_inference_clayton2(N = N, 
                                                                                r = r, 
                                                                                fixed_cost = fixed_cost,
                                                                                lambda = lambda, 
