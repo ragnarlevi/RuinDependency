@@ -7,7 +7,7 @@ library(progress)
 
 
 source("utils.R")  # functions
-source("parameters.R")  # Parameters used in numerical analysis
+source("parameters_diff_demand.R")  # Parameters used in numerical analysis
 
 
 file = "./Data_clayton_1_diff_loadings_new.RData"
@@ -22,13 +22,15 @@ out_1 <- one_loading_inference_indp(N = N[1],
                                     h_x = h_x,
                                     lambda = lambda[1], 
                                     claim_mean = k[1]*beta[1],
-                                    x_surplus = x_surplus[2], 
+                                    x_surplus = x_surplus, 
                                     demand = demand_1, 
                                     theta_finess = 0.001,
+                                    infinite_survival = infinite_survival1,
                                     theta_grid_ruin = theta_grid_ruin,
                                     S_ = S_marginal, 
                                     shape = k[1], 
                                     scale = beta[1])
+
 
 # Fin theta which minimizes the the first marginal
 v_min_1 <- out_1$df %>% group_by(surplus) %>% summarise(V_min = min(value), theta_min = x[which(value == min(value))])
@@ -70,6 +72,7 @@ out_2 <- one_loading_inference_indp(N = N[2],
                                     x_surplus = x_surplus, 
                                     demand = demand_2, 
                                     S_ = S_marginal,
+                                    infinite_survival = infinite_survival3,
                                     theta_grid_ruin = theta_grid_ruin,
                                     shape = k[2], 
                                     scale = beta[2])
@@ -113,6 +116,7 @@ out_one_indp <- one_loading_inference_indp(N = N,
                                            x_surplus = x_surplus,
                                            theta_finess = 0.001,
                                            theta_grid_ruin = theta_grid_ruin,
+                                           infinite_survival = infinite_survival3,
                                            S_ = S_, 
                                            a = k, 
                                            b = beta)
@@ -149,7 +153,7 @@ out_one_indp$opt_ruin_theta
 # These take some time to calculate, The higher the surplus, the higher the complexity.
 
   
-out_both_one_dep_1 <- one_loading_inference_dep(N = N, 
+out_both_one_dep_1 <- one_loading_inference_dep2(N = N, 
                                               r = r, 
                                               fixed_cost = fixed_cost, 
                                               lambda = lambda, 
@@ -159,13 +163,14 @@ out_both_one_dep_1 <- one_loading_inference_dep(N = N,
                                               x_surplus = x_surplus[1],
                                               demand = demand,
                                               theta_grid_ruin = theta_grid_ruin,
+                                              infinite_survival = infinite_survival3,
                                               h_x = h_x, 
                                               f_z_max = 30, 
                                               theta_finess = 0.01,
                                               f_z_limit = 30)
 
 save.image(file)
- out_both_one_dep_2 <- one_loading_inference_dep(N = N, 
+ out_both_one_dep_2 <- one_loading_inference_dep2(N = N, 
                                                 r = r, 
                                                 fixed_cost = fixed_cost, 
                                                 lambda = lambda, 
@@ -174,14 +179,15 @@ save.image(file)
                                                 beta = beta,
                                                 x_surplus = x_surplus[2],
                                                 theta_grid_ruin = theta_grid_ruin,
+                                                infinite_survival = infinite_survival3,
                                                 demand = demand, 
                                                 h_x = h_x, 
-                                                f_z_max = 100, 
+                                                f_z_max = 30, 
                                                 theta_finess = 0.01)
  
 save.image(file)
 
-out_both_one_dep_3 <- one_loading_inference_dep(N = N, 
+out_both_one_dep_3 <- one_loading_inference_dep2(N = N, 
                                                 r = r, 
                                                 fixed_cost = fixed_cost, 
                                                 lambda = lambda, 
@@ -190,9 +196,10 @@ out_both_one_dep_3 <- one_loading_inference_dep(N = N,
                                                 beta = beta,
                                                 x_surplus = x_surplus[3],
                                                 theta_grid_ruin = theta_grid_ruin,
+                                                infinite_survival = infinite_survival3,
                                                 demand = demand, 
                                                 h_x = h_x, 
-                                                f_z_max = 100, 
+                                                f_z_max = 30, 
                                                 theta_finess = 0.01)
 
 save.image(file)

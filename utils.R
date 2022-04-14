@@ -148,6 +148,126 @@ infinite_survival3 <- function(to, h_x, p, lambda_true, mean_true, f_ = "", S_ =
   # Calculate all values before looping
   S_bar_v <- S_bar(x_steps, ...)
   S_2bar_v <- S_2bar(x_steps,  ...)
+  # S_bar_v <- S_bar(x_steps, l1 = l1, l2 = l2, nu = nu,a = k, b = beta,
+  #                  p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
+  # S_2bar_v <- S_2bar(x_steps,  l1 = l1, l2 = l2, nu = nu,a = k, b = beta,
+  #                    p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
+  
+  if(print_time)print(Sys.time() - ttt)
+  
+  
+  
+  
+  # V_bar[2] <- 1-1/(1+theta)
+  
+  ratio <- lambda_true/p
+  # V_bar[3] <- V_bar[2]+ ratio*(V_bar[2]*S_(x_steps[3], ...)*h_x/2+V_bar[2]*S_(x_steps[2], ...)*h_x/2)
+  for(i in 1:(N_x-1)){
+    # print(paste0(i, " of ", N_x, sep = ""))
+    
+    if(i==1){
+      
+      tmp1 <- V_bar[i-1+1]*(S_bar_v[i+1]-S_bar_v[i+1-1])
+      tmp2 <- (x_steps[i+1] - x_steps[i+1] -x_steps[i+1-1])*S_bar_v[i+1] - (x_steps[i+1]-2*x_steps[i+1-1])*S_bar_v[i+1-1] +
+        S_2bar_v[i+1] - S_2bar_v[i+1-1]
+      
+      V_bar[1+1] <- (V_bar[0+1]+ratio*(tmp1-tmp2*V_bar[1-1+1]/h_x))/(1-ratio*tmp2/h_x)
+      
+    }else{
+      
+      s <- 0
+      for(j in 2:i){
+        s <- s + V_bar[i-j+1]*(S_bar_v[j+1]-S_bar_v[j-1+1]) +
+          ((V_bar[i-j+1+1]-V_bar[i-j+1])/h_x)*((x_steps[i+1] - x_steps[j+1] - x_steps[i-j+1])*S_bar_v[j+1]-
+                                                 (x_steps[i+1] - x_steps[j-1+1] - x_steps[i-j+1])*S_bar_v[j-1+1] +
+                                                 S_2bar_v[j+1] - S_2bar_v[j-1+1])
+      }
+      
+      tmp1 <- V_bar[i-1+1]*(S_bar_v[1+1] - S_bar_v[0+1])
+      tmp2 <- (x_steps[i+1] - x_steps[1+1] -x_steps[i-1+1])*S_bar_v[1+1] - (x_steps[i+1]-x_steps[0+1]-x_steps[i-1+1])*S_bar_v[0+1] +
+        S_2bar_v[1+1] - S_2bar_v[0+1]
+      
+      V_bar[i+1] <- (V_bar[1]+ratio*s+ratio*(tmp1-tmp2*V_bar[i-1+1]/h_x))/(1-ratio*tmp2/h_x)
+      
+      
+    }
+    
+  }
+  
+  ret <- list()
+  ret$V_bar <- V_bar
+  ret$V <- 1-V_bar
+  ret$x <- x_steps
+  return(ret)
+}
+
+
+
+
+
+infinite_survival1 <- function(to, h_x, p, lambda_true, mean_true, f_ = "", S_ = "", print_time = FALSE, lower = 0, ...){
+  
+  
+  # We a surplus horzion as computers are finite, we expect v(t,x) -> 0 as x->infinity
+  x_steps <- seq(from = 0,to = to, by = h_x)
+  N_x <- length(x_steps)
+  V_bar <- matrix(NA, nrow = N_x , ncol =1)
+  
+  
+  # Do survival
+  
+  
+  V_bar[1] <- 1-lambda_true*mean_true/p
+  
+  if(V_bar[1]>=1 | V_bar[1]<= 0){
+    warning(paste0("V_bar is: ", V_bar[1]))
+  }
+  
+  if(is.character(f_) & is.character(S_)){
+    stop("Either f_ or S_has to be specified")
+  }
+  
+  
+  if(is.character(S_)){
+  S_ <- function(x, ...){
+    1-sum(unlist(sapply(seq(from= 0, to =  x, by = 0.01),
+                      function(z){
+                        f_(z, ...)
+                        }) ))*0.01
+  }
+  S_ <- Vectorize(S_, vectorize.args = "x")
+  }
+  
+  
+  
+  
+  S_bar <- function(x,...){
+    # print(x)
+    integrate(S_, lower = lower, upper = x, subdivisions = 5000, ...)$value
+  }
+  S_bar <- Vectorize(S_bar, vectorize.args = "x")
+  
+  
+  # S_bar <- function(x,...){
+  # #print(x)
+  #   sum(unlist(sapply(seq(from= 0, to =  x, by = 0.01), 
+  #                       function(z){
+  #                         S_(z, ...)
+  #                       }) ))*0.01
+  # }
+  # S_bar <- Vectorize(S_bar, vectorize.args = "x")
+  
+  S_2bar <- function(x,...){
+    #print(x)
+    integrate(S_bar, lower = lower, upper = x, subdivisions = 5000, ...)$value
+  }
+  S_2bar <- Vectorize(S_2bar, vectorize.args = "x")
+  
+  ttt <- Sys.time()
+  # print(ttt)
+  # Calculate all values before looping
+  S_bar_v <- S_bar(x_steps, ...)
+  S_2bar_v <- S_2bar(x_steps,  ...)
   # S_bar_v <- S_bar(x_steps, l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
   #                  p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
   # S_2bar_v <- S_2bar(x_steps,  l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
@@ -202,6 +322,7 @@ infinite_survival3 <- function(to, h_x, p, lambda_true, mean_true, f_ = "", S_ =
 }
 
 
+
 plot_all <- function(ruin_lines, profit_lines, theta_lim = c(0,1), optimal_expected_profit, optimal_theta = NA, opt_ruin_theta = NA, text_offset = 0,
                      breaks = c(0, 10000, 20000, 30000, 40000), size = 2, y_lim = c(0,1.05) ){
   #my_blue = brewer.pal(n = 9, "Blues")[2:9] 
@@ -244,7 +365,7 @@ plot_all <- function(ruin_lines, profit_lines, theta_lim = c(0,1), optimal_expec
 
 
 
-one_loading_inference_indp <- function(N, r, fixed_cost, lambda = rep(1, length(N)), claim_mean, 
+one_loading_inference_indp <- function(N, r, fixed_cost, lambda = rep(1, length(N)), claim_mean, infinite_survival,
                                        x_surplus, demand, h_x = 10, theta_finess = 0.05,theta_grid_ruin, S_, verbose = TRUE, ...){
   
   
@@ -322,7 +443,7 @@ one_loading_inference_indp <- function(N, r, fixed_cost, lambda = rep(1, length(
         thetas_to_df[[j]] <- thetas_ok[j]
         value_to_df[[j]] <- 1
       }else {
-        out <- infinite_survival3(to = x_surplus[i], 
+        out <- infinite_survival(to = x_surplus[i], 
                                 h_x = h_x, 
                                 p = p,
                                 lambda_true = lambda_true,
@@ -387,7 +508,7 @@ one_loading_inference_indp <- function(N, r, fixed_cost, lambda = rep(1, length(
 
 
 # Assuming only two
-one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N)), nu, k, beta,  x_surplus, demand, 
+one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N)), nu, k, beta,  x_surplus, demand, infinite_survival,
                                       h_x = 10, f_z_max = 10000, theta_finess = 0.1, f_z_limit = f_z_max, verbose = TRUE, theta_grid_ruin){
   
   
@@ -421,7 +542,7 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
     val <- l1*l2*dgamma(x = x1, shape = a[1], scale = b[1])*dgamma(x = x2, shape = a[2], scale = b[2])*
       copula_density(u1 = l1*(1-pgamma(q = x1, shape = a[1], scale = b[1]) + 0.0001), 
                      u2 = l2*(1-pgamma(q = x2, shape = a[2], scale = b[2]) + 0.0001), nu)/l_common
-    # val[is.nan(val)] <- 0
+    val[is.nan(val)] <- 0.0001
     
     return(val)
     
@@ -456,6 +577,7 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
   
   f_z <- Vectorize(f_z, vectorize.args = "z")
   
+  f_z(100,k, beta, 1, 0.08, 0.01, 0.005)
 
   # Density of the marginal common jump
   f_1perp <- function(x, l1, l2, a,b, nu){
@@ -575,8 +697,8 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
     warning("No theta above optimal theta that gives negative expected value")
   }
 
-  
-  # Ruin probability as function of theta for given surplus
+
+# Ruin probability as function of theta for given surplus
   
   df_dep_one <- list()
   thetas_ok <- theta_grid_ruin
@@ -627,7 +749,7 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
         thetas_to_df[[j]] <- thetas_ok[j]
         value_to_df[[j]] <- 1
       }else{
-        out <- infinite_survival3(to = x_surplus[i], 
+        out <- infinite_survival(to = x_surplus[i], 
                                  h_x = h_x, 
                                  p = p,
                                  lambda_true = lambda_true,
@@ -1521,3 +1643,307 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
   return(ret)
   
 }
+
+
+
+
+
+
+# Assuming only two
+one_loading_inference_dep2 <- function(N, r, fixed_cost, lambda = rep(1, length(N)), nu, k, beta,  x_surplus, demand, infinite_survival,
+                                      h_x = 10, f_z_max = 10000, theta_finess = 0.1, f_z_limit = f_z_max, verbose = TRUE, theta_grid_ruin){
+  
+  # We use the clayton copula
+  clayton_copula <- function(x1,x2, nu){
+    tmp <- ((x1)^(-nu)+(x2)^(-nu))^(-1/nu)
+    return(tmp)
+  }
+  
+  
+  
+  f_bivariate <- function(x1, x2,nu, b, a_var, l1, l2, l_common){  
+    copula_density <- function(u1, u2, nu){
+      
+      return((1+nu)*(u1^(-nu)+u2^(-nu))^(-1/nu - 2)*(u1^(-nu-1)*u2^(-nu-1)))
+    }
+    
+    val <- l1*l2*dgamma(x = x1, shape = a_var[1], scale = b[1])*dgamma(x = x2, shape = a_var[2], scale = b[2])*
+      copula_density(u1 = l1*(1-pgamma(q = x1, shape = a_var[1], scale = b[1]) + 0.0001), 
+                     u2 = l2*(1-pgamma(q = x2, shape = a_var[2], scale = b[2]) + 0.0001), nu)/l_common
+    val[val==0] <- 0
+    
+    return(val)
+    
+  }
+  
+  F_z <- function(z,a, b, nu, l1, l2 , l_common){
+    
+    ok <- function(x){
+      integrate(f_bivariate, lower = 0, upper = z-x, x2 = x, nu = nu, b = beta, a_var = a, l1=l1,l2=l2,l_common =l_common)$value
+      
+    }
+    ok <- Vectorize(ok, vectorize.args = "x")
+    
+    integrate(ok, lower = 0, upper = z*10)$value
+    
+    
+  }
+  
+  F_z <- Vectorize(F_z, vectorize.args = "z")
+  
+  
+  
+  F_indp_perp <- function(x, a,b, nu, l1, l2, l_common){
+    l1_perp <- l1-l_common
+    
+    tmp1 <- l1*(1-pgamma(q = x, shape = a, scale = b))/l1_perp
+    
+    tmp2 <- clayton_copula(l1*(1-pgamma(q = x, shape = a, scale = b)), l2,nu)/l1_perp
+    
+    return(1- tmp1+tmp2)
+    
+    
+  }
+  F_indp_perp <- Vectorize(F_indp_perp, vectorize.args = "x")
+  
+  
+  
+  
+  # Distribution of the marginal common jump
+  F_1perp <- function(x, l1, l2, a,b, nu){
+    
+    l_common <- clayton_copula(l1,l2,nu)
+    
+    surv <- 1-pgamma(q = x, shape = a, scale = b)
+    
+    1 - clayton_copula(l1*surv,l2,nu)/l_common
+    
+  }
+  F_1perp <- Vectorize(F_1perp, vectorize.args = "x")
+  
+  
+  
+  
+  F_combined <- function(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2){
+    
+    l_common <- clayton_copula(l1,l2,nu)
+    l1_perp <- l1 - l_common
+    l2_perp <- l2 - l_common
+    
+    l_tilde <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
+    
+    F_z_val <- F_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )
+    
+    
+    val <- p_1*l1_perp*F_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
+      p_2*l2_perp*F_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/l_tilde +
+      p_1_0*l_common*F_1perp(x = x, l1 = l1, l2 = l2, a = a[1], b = b[1], nu = nu)/l_tilde +
+      p_0_2*l_common*F_1perp(x = x, l1 = l2, l2 = l1, a = a[2], b = b[2], nu = nu)/l_tilde +
+      p_1*p_2*l_common*F_z_val/l_tilde
+    val[is.nan(val)] <- 0
+    val
+    
+    
+  }
+  F_combined <- Vectorize(F_combined, vectorize.args = "x")
+  
+  S_combined <- function(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2){1-F_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2)}
+  
+  S_combined <- Vectorize(S_combined, vectorize.args = "x")
+  
+  mean_func <- function(x ,l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2 ){
+    S_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2 )
+  }
+  
+  mean_func <- Vectorize(mean_func, vectorize.args = "x")
+  
+  
+
+  # Find minimum theta
+  thetas <- seq(from = 0, to = 1, by = 0.01)
+  # if demand returns a vector then doing vector thingy can lear to some errors
+  expected_income <- list()
+  
+  if(verbose){
+    pb <- progress_bar$new(format = "  downloading [:bar] :percent eta: :eta",
+                           total = length(x_surplus)*length(thetas))
+  }
+  
+  for( i in 1:length(thetas)){
+    demands <- demand(thetas[i])
+    #l1 <- N[1]*demands[1]*lambda[1]
+    #l2 <- N[2]*demands[2]*lambda[2]
+    l1 <- N[1]*lambda[1]
+    l2 <- N[2]*lambda[2]
+    
+    l_common <- clayton_copula(l1,l2,nu)
+    l1_perp <- l1 - l_common
+    l2_perp <- l2 - l_common
+    
+    # Define probabilities
+    p_1 <- demands[1]
+    p_2 <- demands[2]
+    p_1_0 <- demands[1]*(1-demands[2])
+    p_0_2 <- demands[2]*(1-demands[1])
+    p_1_2 <- demands[1]*demands[2]
+    
+    
+    sum_to_one <- F_combined(100, l1, l2, nu, k,beta,p_1,p_1_0,p_2,p_0_2)
+    
+    
+    
+    
+    if(sum_to_one <0.999){
+      stop(paste0("f_z sum is ", sum_to_one))
+    }
+    
+    l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
+    
+    claim_mean_all <- integrate(mean_func, lower = 0, upper = f_z_max,
+                                l1 = l1, l2 = l2, nu = nu,a = k, b = beta,
+                                p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2,
+                                subdivisions = 5000)$value
+    
+    expected_income[[i]] <- (1+thetas[i])*sum(c(l1*demands[1], l2*demands[2])*k*beta ) - sum(fixed_cost) - claim_mean_all*l_all
+    
+    if(verbose){
+      pb$tick()
+    }
+    
+  }
+  
+  print("Expected profit done.")
+  expected_income <- unlist(expected_income)
+  plot(thetas, expected_income)
+  
+  
+  if(all(expected_income<=0) ){
+    stop("Always ruin")
+  }
+  
+  
+  theta_optimal <- thetas[expected_income == max(expected_income)]
+  theta_min <- thetas[min(expected_income[expected_income>0 & thetas < theta_optimal]) == expected_income]
+  #  print(theta_min)
+  theta_max <- thetas[min(expected_income[expected_income>0 & thetas > theta_optimal]) == expected_income]
+  
+  if(theta_max == thetas[length(thetas)]){
+    warning("No theta above optimal theta that gives negative expected value")
+  }
+  
+  
+  # Ruin probability as function of theta for given surplus
+  
+  df_dep_one <- list()
+  thetas_ok <- theta_grid_ruin
+  if(verbose){
+    pb1 <- progress_bar$new(format = "  downloading [:bar] :percent eta: :eta",
+                            total = length(x_surplus)*length(thetas_ok))
+  }
+  for(i in 1:length(x_surplus)){
+    print(i)
+    thetas_to_df <- list()
+    value_to_df <- list()
+    for(j in 1:length(thetas_ok)){
+      print(j)
+      
+      
+      demands <- demand(thetas_ok[j])
+      l1 <- N[1]*lambda[1]
+      l2 <- N[2]*lambda[2]
+      
+      l_common <- clayton_copula(l1,l2,nu)
+      l1_perp <- l1 - l_common
+      l2_perp <- l2 - l_common
+      
+      
+      # Define probabilities
+      p_1 <- demands[1]
+      p_2 <- demands[2]
+      p_1_0 <- demands[1]*(1-demands[2])
+      p_0_2 <- demands[2]*(1-demands[1])
+      p_1_2 <- demands[1]*demands[2]
+      
+      
+      
+      
+      l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
+      
+      
+      mean_true <-  integrate(mean_func, lower = 0, upper = f_z_max, 
+                              l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
+                              p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, 
+                              subdivisions = 1000)$value
+      print("mean_true calculated")
+      lambda_true <-  l_all
+      p <-  (1+thetas_ok[j])*sum(c(l1*demands[1], l2*demands[2])*k*beta ) - sum(fixed_cost)
+      
+      if(p<=mean_true*lambda_true){
+        warning(paste0("Ruin will happen ", thetas_ok[j]))
+        thetas_to_df[[j]] <- thetas_ok[j]
+        value_to_df[[j]] <- 1
+      }else{
+        a <- Sys.time()
+        out <- infinite_survival(to = x_surplus[i], 
+                                 h_x = h_x, 
+                                 p = p,
+                                 lambda_true = lambda_true,
+                                 mean_true = mean_true,
+                                 S_ = S_combined,
+                                 l1 = l1, l2 = l2, nu = nu,a = k, b = beta,
+                                 p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
+        Sys.time() - a
+        
+        length_out <- length(out$V)
+        #print("out$V calculated")
+        
+        thetas_to_df[[j]] <- thetas_ok[j]
+        value_to_df[[j]] <- out$V[length_out] 
+      }
+      
+      if(verbose){
+        pb1$tick()
+      }
+      
+    }
+    
+    df_dep_one[[i]] <- data.frame(x = unlist(thetas_to_df), value = unlist(value_to_df), surplus = paste(x_surplus[i]))
+    
+  }
+  
+  df_dep_one <- do.call(what = rbind, df_dep_one)
+  
+  
+  
+  # plot
+  # gg <- plot_all(ruin_lines = df_dep_one, 
+  #                profit_lines = data.frame(x = thetas, y = expected_income/max(expected_income), id = "Expected Profit"), 
+  #                theta_lim = c(0,theta_max), 
+  #                optimal_expected_profit = max(expected_income))
+  
+  surpluses <- unique(df_dep_one$surplus)
+  optimal <- list()
+  for( i in 1:length(surpluses)){
+    
+    optimal[[i]] <- thetas_ok[df_dep_one$value[df_dep_one$surplus == surpluses[i]] 
+                              == min(df_dep_one$value[df_dep_one$surplus == surpluses[i]])]
+    
+  }
+  optimal <- unlist(optimal)
+  if(length(unique(optimal)) != 1) warning("more than one optimal value for ruin")
+  
+  
+  ret <- list()
+  # ret$plot <- gg
+  ret$df <- df_dep_one
+  ret$expected_proift <- expected_income
+  ret$thetas <- thetas
+  ret$thetas_ok <- thetas_ok
+  ret$optimal_expected_profit <- max(expected_income)
+  ret$optimal_theta <- theta_optimal
+  ret$opt_ruin_theta <- optimal[1]
+  return(ret)
+  
+  
+}
+
