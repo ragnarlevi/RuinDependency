@@ -13,7 +13,215 @@
 library(progress)
 library(tidyverse)
 
-plot_ruin <- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, v_min = NA ){
+
+
+S_common <- function(x1,x2,a,b, l1, l2, l_common, nu){
+  
+  tmp <- (((l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])))^(-nu) + 
+             (l2*(1-pgamma(q = x2, shape = a[2], scale = b[2])))^(-nu))^(-1/nu))/l_common
+  return(tmp)
+}
+
+
+
+# We use the clayton Levy copula
+clayton_copula <- function(x1,x2, nu){
+  tmp <- ((x1)^(-nu)+(x2)^(-nu))^(-1/nu)
+  return(tmp)
+}
+
+
+# assume gamma margin, straight forward to adjust for more general case
+f_bivariate <- function(x1, x2, nu, a, b, l1, l2, l_common){
+  
+  copula_density <- function(u1, u2, nu){
+    
+    return((1+nu)*(u1^(-nu)+u2^(-nu))^(-1/nu - 2)*(u1^(-nu-1)*u2^(-nu-1)))
+  }
+  
+  val <- l1*l2*dgamma(x = x1, shape = a[1], scale = b[1])*dgamma(x = x2, shape = a[2], scale = b[2])*
+    copula_density(u1 = l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])), 
+                   u2 = l2*(1-pgamma(q = x2, shape = a[2], scale = b[2])), nu)/l_common
+  
+  val[is.nan(val)] <- 0
+  
+  
+  return(val)
+  
+}
+
+
+# Density of independent jumps
+f_indp_perp <- function(x, a,b, nu, l1, l2, l_common){
+  l1_perp <- l1-l_common
+  
+  tmp1 <- l1*dgamma(x = x, shape = a, scale = b)/l1_perp
+  tmp2 <- ((l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu) + l2^(-nu))^(-1/nu-1)*
+    (l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu-1)*l1*dgamma(x = x, shape = a, scale = b)/l1_perp
+  
+  if(x < f_z_limit){
+    return(tmp1 - tmp2)
+  }else{
+    return(0)
+  }
+  
+}
+
+f_indp_perp <- Vectorize(f_indp_perp, vectorize.args = "x")
+# density of the sum of common jumps is
+f_z <- function(z, a,b, nu, l1, l2, l_common){
+  sum(unlist(sapply(seq(from=0, to =  z, by = 0.1), function(x, z){
+    f_bivariate(x,z-x, nu, a, b, l1, l2, l_common)}, z=z) ))*0.1
+}
+
+f_z <- Vectorize(f_z, vectorize.args = "z")
+
+
+
+# Density of the marginal common jump
+
+f_1perp <- function(x, l1, l2, a,b, nu){
+  
+  l_common <- clayton_copula(l1,l2,nu)
+  
+  ((l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu) + l2^(-nu))^(-1/nu-1)*
+    (l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu-1)*l1*dgamma(x = x, shape = a, scale = b)/l_common
+  
+}
+
+f_1perp <- Vectorize(f_1perp, vectorize.args = "x")
+
+#integrate(f_1perp, lower = 0, upper = 100, l1 = 3, l2 = 4, a = 2, b = 5, nu = 0.2)
+
+
+f_combined <- function(x, l1, l2, nu, a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 = p_1*p_2){
+  
+  l_common <- clayton_copula(l1,l2,nu)
+  l1_perp <- l1 - l_common
+  l2_perp <- l2 - l_common
+  
+  l_tilde <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1_2)*l_common
+  
+  
+  val <- p_1*l1_perp*f_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
+    p_2*l2_perp*f_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/l_tilde +
+    p_1_0*l_common*f_1perp(x = x, l1 = l1, l2 = l2, a = a[1], b = b[1], nu = nu)/l_tilde +
+    p_0_2*l_common*f_1perp(x = x, l1 = l2, l2 = l1, a = a[2], b = b[2], nu = nu)/l_tilde +
+    p_1_2*l_common*f_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )/l_tilde
+  # print(val)
+  
+  val[is.nan(val)] <- 0
+  val
+  
+  
+  
+  
+  
+}
+f_combined <- Vectorize(f_combined, vectorize.args = "x")
+
+
+
+mean_func <- function(x ,l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 = p_1*p_2 ){
+  x*f_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2,p_1_2 )
+}
+
+
+
+# We use the clayton copula
+clayton_copula <- function(x1,x2, nu){
+  tmp <- ((x1)^(-nu)+(x2)^(-nu))^(-1/nu)
+  return(tmp)
+}
+
+
+
+F_z <- function(z,a, b, nu, l1, l2 , l_common){
+  
+  ok <- function(x){
+    integrate(f_bivariate, lower = 0, upper = z-x, x2 = x, nu = nu, b = beta, a = a, l1=l1,l2=l2,l_common =l_common)$value
+    
+  }
+  ok <- Vectorize(ok, vectorize.args = "x")
+  
+  integrate(ok, lower = 0, upper = z*10)$value
+  
+  
+}
+
+F_z <- Vectorize(F_z, vectorize.args = "z")
+
+
+
+F_indp_perp <- function(x, a,b, nu, l1, l2, l_common){
+  l1_perp <- l1-l_common
+  
+  tmp1 <- l1*(1-pgamma(q = x, shape = a, scale = b))/l1_perp
+  
+  tmp2 <- clayton_copula(l1*(1-pgamma(q = x, shape = a, scale = b)), l2,nu)/l1_perp
+  
+  return(1- tmp1+tmp2)
+  
+  
+}
+F_indp_perp <- Vectorize(F_indp_perp, vectorize.args = "x")
+
+
+
+
+# Distribution of the marginal common jump
+F_1perp <- function(x, l1, l2, a,b, nu){
+  
+  l_common <- clayton_copula(l1,l2,nu)
+  
+  surv <- 1-pgamma(q = x, shape = a, scale = b)
+  
+  1 - clayton_copula(l1*surv,l2,nu)/l_common
+  
+}
+F_1perp <- Vectorize(F_1perp, vectorize.args = "x")
+
+
+
+
+F_combined <- function(x, l1, l2, nu, a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 = p_1*p_2){
+  
+  l_common <- clayton_copula(l1,l2,nu)
+  l1_perp <- l1 - l_common
+  l2_perp <- l2 - l_common
+  
+  l_tilde <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1_2)*l_common
+  
+  F_z_val <- F_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )
+  
+  
+  val <- p_1*l1_perp*F_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
+    p_2*l2_perp*F_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/l_tilde +
+    p_1_0*l_common*F_1perp(x = x, l1 = l1, l2 = l2, a = a[1], b = b[1], nu = nu)/l_tilde +
+    p_0_2*l_common*F_1perp(x = x, l1 = l2, l2 = l1, a = a[2], b = b[2], nu = nu)/l_tilde +
+    p_1_2*l_common*F_z_val/l_tilde
+  val[is.nan(val)] <- 0
+  val
+  
+  
+}
+F_combined <- Vectorize(F_combined, vectorize.args = "x")
+
+S_combined <- function(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 = p_1*p_2){1-F_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2, p_1_2)}
+
+S_combined <- Vectorize(S_combined, vectorize.args = "x")
+
+mean_func_S <- function(x ,l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 = p_1*p_2 ){
+  S_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 )
+}
+
+mean_func_S <- Vectorize(mean_func, vectorize.args = "x")
+
+
+
+
+
+plot_ruin <- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, v_min = NA, lim = c(0.28, 0.31) ){
   fig_ruin <- plot_ly(showscale = TRUE,
                       type = type,
                       y = ~ t1,
@@ -26,11 +234,11 @@ plot_ruin <- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, v_m
   fig_ruin <- fig_ruin %>% layout(yaxis = list(title = "&#952;<sub>1</sub>", 
                                                tickfont = list(size = 22), 
                                                titlefont = list(size = 24), 
-                                               range = c(0, 0.7)),
+                                               range = lim),
                                   xaxis = list(title = "&#952;<sub>2</sub>", 
                                                tickfont = list(size = 22), 
                                                titlefont = list(size = 24),
-                                               range = c(0, 0.7)))
+                                               range = lim))
   
   
   text <- paste0("(",t2_opt, ",", t1_opt, ")-> ",v_min, sep ="" )
@@ -44,7 +252,7 @@ plot_ruin <- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, v_m
   fig_ruin
 }
 
-plot_profit<- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, prof_max = NA ){
+plot_profit<- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, prof_max = NA, lim = c(0.28, 0.31) ){
   fig_ruin <- plot_ly(showscale = TRUE,
                       type = type,
                       y = ~ t1,
@@ -55,10 +263,12 @@ plot_profit<- function(V, t1, t2, type = "surface", t1_opt = NA, t2_opt = NA, pr
                                     titlefont = list(size = 24)  ) )
   fig_ruin <- fig_ruin %>% layout(yaxis = list(title = "&#952;<sub>1</sub>", 
                                                tickfont = list(size = 22),
-                                               titlefont = list(size = 24)),
+                                               titlefont = list(size = 24),
+                                               range = lim),
                                   xaxis = list(title = "&#952;<sub>2</sub>", 
                                                tickfont = list(size = 22), 
-                                               titlefont = list(size = 24)))
+                                               titlefont = list(size = 24),
+                                               range = lim))
   
   text <- paste0("(",t2_opt, ",", t1_opt, ")-> ", prof_max, sep ="" )
   
@@ -114,7 +324,7 @@ infinite_survival3 <- function(to, h_x, p, lambda_true, mean_true, f_ = "", S_ =
   
   
   S_bar <- function(x,...){
-   #print(x)
+    # print(x)
     integrate(S_, lower = lower, upper = x, subdivisions = 5000, ...)$value
   }
   S_bar <- Vectorize(S_bar, vectorize.args = "x")
@@ -130,7 +340,6 @@ infinite_survival3 <- function(to, h_x, p, lambda_true, mean_true, f_ = "", S_ =
   # S_bar <- Vectorize(S_bar, vectorize.args = "x")
   
   S_2bar <- function(x,...){
-    #print(x)
     integrate(S_bar, lower = lower, upper = x, subdivisions = 5000, ...)$value
   }
   S_2bar <- Vectorize(S_2bar, vectorize.args = "x")
@@ -149,9 +358,10 @@ infinite_survival3 <- function(to, h_x, p, lambda_true, mean_true, f_ = "", S_ =
   S_bar_v <- S_bar(x_steps, ...)
   S_2bar_v <- S_2bar(x_steps,  ...)
   # S_bar_v <- S_bar(x_steps, l1 = l1, l2 = l2, nu = nu,a = k, b = beta,
-  #                  p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
+  #                   p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
   # S_2bar_v <- S_2bar(x_steps,  l1 = l1, l2 = l2, nu = nu,a = k, b = beta,
   #                    p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
+  
   
   if(print_time)print(Sys.time() - ttt)
   
@@ -334,7 +544,7 @@ plot_all <- function(ruin_lines, profit_lines, theta_lim = c(0,1), optimal_expec
     scale_color_manual(values = my_blue) +
     
     # geom_point(mapping = aes(x = x, y = value, color = surplus), ruin_point, size = 2) +
-    labs( color = c("Initial Surplus")) +
+    labs( color = c("Initial surplus")) +
     new_scale_color() + 
     
     geom_line(aes(x = x, y = y), profit_lines, size = 1, alpha = 0.6) +
@@ -345,18 +555,18 @@ plot_all <- function(ruin_lines, profit_lines, theta_lim = c(0,1), optimal_expec
     geom_hline(yintercept = 0, color = "black", size = 1) +
     geom_vline(xintercept = 0, color = "black", size = 1) +
     # geom_vline(xintercept = optimal_theta, color = "black", size = 0.5) +
-    annotate("text", x = optimal_theta-text_offset , y = 1.03, label = bquote(theta[profit]^"*" == .(optimal_theta)), size = size ) +
-    annotate("text", x = opt_ruin_theta + text_offset , y = 1.03, label = bquote(theta[ruin]^"*" == .(opt_ruin_theta)), size = size) +
+    annotate("text", x = optimal_theta-text_offset , y = 1.03, label = bquote(theta[profit] == .(optimal_theta)), size = size ) +
+    annotate("text", x = opt_ruin_theta + text_offset , y = 1.03, label = bquote(theta[ruin] == .(opt_ruin_theta)), size = size) +
     geom_segment(aes(x = optimal_theta, xend = optimal_theta, y = 0, yend = 1), linetype = 2) +
     geom_segment(aes(x = opt_ruin_theta, xend = opt_ruin_theta, y = 0, yend = 1), linetype = 2) +
-    labs(x = expression(theta), y = "Probability of Ruin \n", color = "") +
+    labs(x = expression(theta), y = "Probability of ruin \n", color = "") +
     #ggtitle("") +
     theme_bw(base_size = 20) +
     scale_x_continuous(expand = c(0.0015, 0),limits = theta_lim) +
     scale_y_continuous(expand = c(0.002, 0), 
                        limits = y_lim,
-                       sec.axis = sec_axis(~.*optimal_expected_profit, 
-                                           name = "Expected Profit \n", breaks = breaks), label = scales::comma) +
+                       sec.axis = sec_axis(~.*500, 
+                                           name = "Expected profit \n", breaks = breaks), label = scales::comma) +
     theme(legend.justification = "top")
   return(gg)
 }
@@ -513,105 +723,6 @@ one_loading_inference_dep <- function(N, r, fixed_cost, lambda = rep(1, length(N
   
   
   
-  
-  
-  # We use the clayton copula
-  clayton_copula <- function(x1,x2, nu){
-    tmp <- ((x1)^(-nu)+(x2)^(-nu))^(-1/nu)
-    return(tmp)
-  }
-  
-  
-  # assume exponential margin, 
-  f_bivariate <- function(x1, x2, nu, a, b, l1, l2, l_common){
-    
-    copula_density <- function(u1, u2, nu){
-      
-      return((1+nu)*(u1^(-nu)+u2^(-nu))^(-1/nu - 2)*(u1^(-nu-1)*u2^(-nu-1)))
-    }
-    
-    val <- l1*l2*dgamma(x = x1, shape = a[1], scale = b[1])*dgamma(x = x2, shape = a[2], scale = b[2])*
-      copula_density(u1 = l1*(1-pgamma(q = x1, shape = a[1], scale = b[1]) + 0.0001), 
-                     u2 = l2*(1-pgamma(q = x2, shape = a[2], scale = b[2]) + 0.0001), nu)/l_common
-    val[is.nan(val)] <- 0.0001
-    
-    return(val)
-    
-  }
-  
-  
-  # Density of independent jumps
-  f_indp_perp <- function(x, a,b, nu, l1, l2, l_common){
-    l1_perp <- l1-l_common
-    
-    tmp1 <- l1*dgamma(x = x, shape = a, scale = b)/l1_perp
-    tmp2 <- ((l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu) + l2^(-nu))^(-1/nu-1)*
-      (l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu-1)*l1*dgamma(x = x, shape = a, scale = b)/l1_perp
-    
-    if(x< f_z_limit){
-      return(tmp1 - tmp2)
-    }else{
-      return(0)
-    }
-    
-  }
-  
-  f_indp_perp <- Vectorize(f_indp_perp, vectorize.args = "x")
-  # density of the sum of common jumps is
-
-  
-  
-  f_z <- function(z, a,b, nu, l1, l2, l_common){
-    sum(unlist(sapply(seq(from= 0, to =  z, by = 0.1), function(x, z){
-      f_bivariate(x,z-x, nu, a, b, l1, l2, l_common)}, z=z) ))*0.1
-  }
-  
-  f_z <- Vectorize(f_z, vectorize.args = "z")
-  
-  f_z(100,k, beta, 1, 0.08, 0.01, 0.005)
-
-  # Density of the marginal common jump
-  f_1perp <- function(x, l1, l2, a,b, nu){
-    
-    l_common <- clayton_copula(l1,l2,nu)
-    
-    ((l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu) + l2^(-nu))^(-1/nu-1)*
-      (l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu-1)*l1*dgamma(x = x, shape = a, scale = b)/l_common
-    
-  }
-  f_1perp <- Vectorize(f_1perp, vectorize.args = "x")
-  
-  
-  
-  
-  f_combined <- function(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2){
-    
-    l_common <- clayton_copula(l1,l2,nu)
-    l1_perp <- l1 - l_common
-    l2_perp <- l2 - l_common
-    
-    l_tilde <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
-    
-    
-    val <- p_1*l1_perp*f_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
-      p_2*l2_perp*f_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/l_tilde +
-      p_1_0*l_common*f_1perp(x = x, l1 = l1, l2 = l2, a = a[1], b = b[1], nu = nu)/l_tilde +
-      p_0_2*l_common*f_1perp(x = x, l1 = l2, l2 = l1, a = a[2], b = b[2], nu = nu)/l_tilde +
-      p_1*p_2*l_common*f_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )/l_tilde
-    val[is.nan(val)] <- 0
-    val
-    
-    
-  }
-  f_combined <- Vectorize(f_combined, vectorize.args = "x")
-  
-  
-  
-  mean_func <- function(x ,l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2 ){
-    x*f_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2 )
-  }
-  
-
 
   # Find minimum theta
   thetas <- seq(from = 0, to = 1, by = 0.01)
@@ -808,122 +919,6 @@ one_loading_inference_clayton <- function(N, r, fixed_cost, lambda = rep(1, leng
                                       h_x = 10, f_z_max = 10000, f_z_limit = f_z_max, ord_copula, theta_grid, cop_par, verbose = TRUE){
   
   "Similar to one_loading_inference_dep but can take copula for acquisition"
-  
-  
-  
-  
-  S_common <- function(x1,x2,a,b, l1, l2, l_common, nu){
-    
-    tmp <- (((l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])))^(-nu) + 
-               (l2*(1-pgamma(q = x2, shape = a[2], scale = b[2])))^(-nu))^(-1/nu))/l_common
-    return(tmp)
-  }
-  
-
-  
-  # We use the clayton Levy copula
-  clayton_copula <- function(x1,x2, nu){
-    tmp <- ((x1)^(-nu)+(x2)^(-nu))^(-1/nu)
-    return(tmp)
-  }
-  
-  
-  # assume gamma margin, straight forward to adjust for more general case
-  f_bivariate <- function(x1, x2, nu, a, b, l1, l2, l_common){
-    
-    copula_density <- function(u1, u2, nu){
-      
-      return((1+nu)*(u1^(-nu)+u2^(-nu))^(-1/nu - 2)*(u1^(-nu-1)*u2^(-nu-1)))
-    }
-    
-    val <- l1*l2*dgamma(x = x1, shape = a[1], scale = b[1])*dgamma(x = x2, shape = a[2], scale = b[2])*
-      copula_density(u1 = l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])), 
-                     u2 = l2*(1-pgamma(q = x2, shape = a[2], scale = b[2])), nu)/l_common
-    
-    val[is.nan(val)] <- 0
-
-    
-    return(val)
-    
-  }
-  
-  
-  # Density of independent jumps
-  f_indp_perp <- function(x, a,b, nu, l1, l2, l_common){
-    l1_perp <- l1-l_common
-    
-    tmp1 <- l1*dgamma(x = x, shape = a, scale = b)/l1_perp
-    tmp2 <- ((l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu) + l2^(-nu))^(-1/nu-1)*
-      (l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu-1)*l1*dgamma(x = x, shape = a, scale = b)/l1_perp
-    
-    if(x < f_z_limit){
-      return(tmp1 - tmp2)
-    }else{
-      return(0)
-    }
-    
-  }
-  
-  f_indp_perp <- Vectorize(f_indp_perp, vectorize.args = "x")
-  # density of the sum of common jumps is
-  f_z <- function(z, a,b, nu, l1, l2, l_common){
-    sum(unlist(sapply(seq(from= 0, to =  z, by = 0.1), function(x, z){
-      f_bivariate(x,z-x, nu, a, b, l1, l2, l_common)}, z=z) ))*0.1
-  }
-  
-  f_z <- Vectorize(f_z, vectorize.args = "z")
-
-  
-  
-  # Density of the marginal common jump
-  
-  f_1perp <- function(x, l1, l2, a,b, nu){
-    
-    l_common <- clayton_copula(l1,l2,nu)
-    
-    ((l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu) + l2^(-nu))^(-1/nu-1)*
-      (l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu-1)*l1*dgamma(x = x, shape = a, scale = b)/l_common
-    
-  }
-  
-  f_1perp <- Vectorize(f_1perp, vectorize.args = "x")
-  
-  #integrate(f_1perp, lower = 0, upper = 100, l1 = 3, l2 = 4, a = 2, b = 5, nu = 0.2)
-  
-  
-  f_combined <- function(x, l1, l2, nu, a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 = p_1*p_2){
-    
-    l_common <- clayton_copula(l1,l2,nu)
-    l1_perp <- l1 - l_common
-    l2_perp <- l2 - l_common
-    
-    l_tilde <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1_2)*l_common
-    
-    
-    val <- p_1*l1_perp*f_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
-      p_2*l2_perp*f_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/l_tilde +
-      p_1_0*l_common*f_1perp(x = x, l1 = l1, l2 = l2, a = a[1], b = b[1], nu = nu)/l_tilde +
-      p_0_2*l_common*f_1perp(x = x, l1 = l2, l2 = l1, a = a[2], b = b[2], nu = nu)/l_tilde +
-      p_1_2*l_common*f_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )/l_tilde
-    # print(val)
-    
-    val[is.nan(val)] <- 0
-    val
-    
-    
-    
-    
-    
-  }
-  f_combined <- Vectorize(f_combined, vectorize.args = "x")
-  
-  
-  
-  mean_func <- function(x ,l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 = p_1*p_2 ){
-    x*f_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2,p_1_2 )
-  }
-  
-  
   
   
   
@@ -1151,110 +1146,7 @@ one_loading_inference_clayton2 <- function(N, r, fixed_cost, lambda = rep(1, len
   
   "Similar to one_loading_inference_dep but can take copula for acquisition"
   
-  # We use the clayton copula
-  clayton_copula <- function(x1,x2, nu){
-    tmp <- ((x1)^(-nu)+(x2)^(-nu))^(-1/nu)
-    return(tmp)
-  }
-  
-  
-  
-  f_bivariate <- function(x1, x2,nu, b, a_var, l1, l2, l_common){  
-    copula_density <- function(u1, u2, nu){
-      
-      return((1+nu)*(u1^(-nu)+u2^(-nu))^(-1/nu - 2)*(u1^(-nu-1)*u2^(-nu-1)))
-    }
-    
-    val <- l1*l2*dgamma(x = x1, shape = a_var[1], scale = b[1])*dgamma(x = x2, shape = a_var[2], scale = b[2])*
-      copula_density(u1 = l1*(1-pgamma(q = x1, shape = a_var[1], scale = b[1]) + 0.0000001), 
-                     u2 = l2*(1-pgamma(q = x2, shape = a_var[2], scale = b[2]) + 0.0000001), nu)/l_common
-    val[val==0] <- 0
-    
-    return(val)
-    
-  }
-  
-  F_z <- function(z,a, b, nu, l1, l2 , l_common){
-    
-    ok <- function(x){
-      integrate(f_bivariate, lower = 0, upper = z-x, x2 = x, nu = nu, b = beta, a_var = a, l1=l1,l2=l2,l_common =l_common)$value
-      
-    }
-    ok <- Vectorize(ok, vectorize.args = "x")
-    
-    integrate(ok, lower = 0, upper = z*10)$value
-    
-    
-  }
-  
-  F_z <- Vectorize(F_z, vectorize.args = "z")
-  
-  
-  
-  F_indp_perp <- function(x, a,b, nu, l1, l2, l_common){
-    l1_perp <- l1-l_common
-    
-    tmp1 <- l1*(1-pgamma(q = x, shape = a, scale = b))/l1_perp
-    
-    tmp2 <- clayton_copula(l1*(1-pgamma(q = x, shape = a, scale = b)), l2,nu)/l1_perp
-    
-    return(1- tmp1+tmp2)
-    
-    
-  }
-  F_indp_perp <- Vectorize(F_indp_perp, vectorize.args = "x")
-  
-  
-  
-  
-  # Distribution of the marginal common jump
-  F_1perp <- function(x, l1, l2, a,b, nu){
-    
-    l_common <- clayton_copula(l1,l2,nu)
-    
-    surv <- 1-pgamma(q = x, shape = a, scale = b)
-    
-    1 - clayton_copula(l1*surv,l2,nu)/l_common
-    
-  }
-  F_1perp <- Vectorize(F_1perp, vectorize.args = "x")
-  
-  
-  
-  
-  F_combined <- function(x, l1, l2, nu, a, b, p_1, p_1_0, p_2, p_0_2, p_1_2){
-    
-    l_common <- clayton_copula(l1,l2,nu)
-    l1_perp <- l1 - l_common
-    l2_perp <- l2 - l_common
-    
-    l_tilde <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1_2)*l_common
-    
-    F_z_val <- F_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )
-    
-    
-    val <- p_1*l1_perp*F_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
-      p_2*l2_perp*F_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/l_tilde +
-      p_1_0*l_common*F_1perp(x = x, l1 = l1, l2 = l2, a = a[1], b = b[1], nu = nu)/l_tilde +
-      p_0_2*l_common*F_1perp(x = x, l1 = l2, l2 = l1, a = a[2], b = b[2], nu = nu)/l_tilde +
-      p_1_2*l_common*F_z_val/l_tilde
-    val[is.nan(val)] <- 0
-    val
-    
-    
-  }
-  F_combined <- Vectorize(F_combined, vectorize.args = "x")
-  
-  S_combined <- function(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2, p_1_2){1-F_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2, p_1_2)}
-  
-  S_combined <- Vectorize(S_combined, vectorize.args = "x")
-  
-  mean_func <- function(x ,l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 ){
-    S_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2, p_1_2 )
-  }
-  
-  mean_func <- Vectorize(mean_func, vectorize.args = "x")
-  
+
   
   
   
@@ -1320,7 +1212,7 @@ one_loading_inference_clayton2 <- function(N, r, fixed_cost, lambda = rep(1, len
     
     l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1_2)*l_common
     
-    claim_mean_all <- integrate(mean_func, lower = 0, upper = f_z_max, 
+    claim_mean_all <- integrate(mean_func_S, lower = 0, upper = f_z_max, 
                                 l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
                                 p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, 
                                 p_1_2 = p_1_2, subdivisions = 5000)$value
@@ -1406,7 +1298,7 @@ one_loading_inference_clayton2 <- function(N, r, fixed_cost, lambda = rep(1, len
       
       
       
-      mean_true <-  integrate(mean_func, lower = 0, upper = f_z_max, 
+      mean_true <-  integrate(mean_func_S, lower = 0, upper = f_z_max, 
                               l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
                               p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2,
                               p_1_2 = p_1_2, subdivisions = 5000)$value
@@ -1487,7 +1379,9 @@ one_loading_inference_clayton2 <- function(N, r, fixed_cost, lambda = rep(1, len
 
 
 #' @param claim_mean - claim mean of the individual claims
-two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, claim_mean, demand,  h_x = 10, S_, theta_finess = 0.001, verbose = TRUE, ...){
+two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, 
+                               claim_mean, theta_grid, theta_grid_profit,
+                               demand,  h_x = 10, S_, verbose = TRUE, ...){
   
   
   
@@ -1506,8 +1400,8 @@ two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, cla
   #   }
   
   
-  thetas_1 <- seq(from = 0.29, to = 0.33, by = theta_finess )
-  thetas_2 <- seq(from = 0.29, to = 0.33, by = theta_finess )
+  thetas_1 <- theta_grid_profit
+  thetas_2 <- theta_grid_profit
   expected_income <- list()
   for(i in 1:length(thetas_1)){
     expected_income[[i]] <- list()
@@ -1532,6 +1426,9 @@ two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, cla
   
   
   expected_income <- do.call(rbind, expected_income)
+  
+  thetas_1 <- theta_grid
+  thetas_2 <- theta_grid
   
   if(verbose){
     pb <- progress_bar$new(format = "  downloading [:bar] :percent eta: :eta",
@@ -1599,6 +1496,8 @@ two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, cla
   ret$V <- V
   ret$theta_1 <- thetas_1
   ret$theta_2 <- thetas_2
+  ret$theta_1_profit <- theta_grid_profit
+  ret$theta_2_profit <- theta_grid_profit
   ret$expected_income <- expected_income
   ret$t1_opt <- t1_opt
   ret$t2_opt <- t2_opt
@@ -1610,209 +1509,17 @@ two_loadings_indep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, cla
 }
 
 
-two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, demand,  h_x = 10, 
-                             theta_finess = 0.05, f_z_max = 10000, nu, f_z_limit = f_z_max, verbose = TRUE){
-  
-  
-  
-  # 
-  #   N <- c(10000, 10000)
-  #   k <- c(2,2)
-  #   beta <- c(500,500)
-  #   fixed_cost <-  c(100,100)
-  #   lambda <- c(0.08, 0.08)
-  #   r <- 0.05*k*beta*lambda # 5% of mean claims, minus a fixed cost
-  #   nu <- 0.5
-  #   demand <- function(theta1, theta2){
-  #     b1 <- c(-0.5, 3)
-  #     b2 <- c(-0.5, 4)
-  #     return(c(1/(1+exp(b1[1]+b1[2]*theta1)), 1/(1+exp(b2[1]+b2[2]*theta2))))
-  #   }
-  
-  
-  
-  S_common <- function(x1,x2,a,b, l1, l2, l_common, nu){
-    
-    tmp <- (((l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])))^(-nu) + 
-               (l2*(1-pgamma(q = x2, shape = a[2], scale = b[2])))^(-nu))^(-1/nu))/l_common
-    return(tmp)
-  }
-  
-  # F_common <- function(x1,x2, a,b,l1,l2, nu){
-  #   l_common <- clayton_copula(l1,l2,nu)
-  #   print(l_common)
-  #   1-clayton_copula(l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])), l2, nu)/l_common -
-  #     clayton_copula(, l1, nu)/l_common +
-  #     clayton_copula(l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])), 0, nu)/l_common 
-  #   
-  # }
-  # 
-  # F_common(10,1000, c(2,2),c(5,5), 3,4, 0.5)
-  # S_common(0,0,c(2,2), c(5,5), 2,3, clayton_copula(2,3,0.2), 0.2)
-  
-  # We use the clayton copula
-  clayton_copula <- function(x1,x2, nu){
-    tmp <- ((x1)^(-nu)+(x2)^(-nu))^(-1/nu)
-    return(tmp)
-  }
-  
-  
-  # assume exponential margin, straight forward to adjust for more general case
-  f_bivariate <- function(x1, x2, nu, a, b, l1, l2, l_common){
-    
-    copula_density <- function(u1, u2, nu){
-      
-      return((1+nu)*(u1^(-nu)+u2^(-nu))^(-1/nu - 2)*(u1^(-nu-1)*u2^(-nu-1)))
-    }
-    
-    val <- l1*l2*dgamma(x = x1, shape = a[1], scale = b[1])*dgamma(x = x2, shape = a[2], scale = b[2])*
-      copula_density(u1 = l1*(1-pgamma(q = x1, shape = a[1], scale = b[1])), 
-                     u2 = l2*(1-pgamma(q = x2, shape = a[2], scale = b[2])), nu)/l_common
-    
-    val[is.nan(val)] <- 0
-    
-    return(val)
-    
-  }
-  
-  
-  # Density of independent jumps
-  f_indp_perp <- function(x, a,b, nu, l1, l2, l_common){
-    l1_perp <- l1-l_common
-    
-    tmp1 <- l1*dgamma(x = x, shape = a, scale = b)/l1_perp
-    tmp2 <- ((l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu) + l2^(-nu))^(-1/nu-1)*
-      (l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu-1)*l1*dgamma(x = x, shape = a, scale = b)/l1_perp
-    
-    if(x< f_z_limit){
-      return(tmp1 - tmp2)
-    }else{
-      return(0)
-    }
-    
-  }
-  
-  f_indp_perp <- Vectorize(f_indp_perp, vectorize.args = "x")
-  # density of the sum of common jumps is
-  f_z <- function(z, a,b, nu, l1, l2, l_common){
-    sum(unlist(sapply(seq(from= 0, to =  z, by = 0.1), function(x, z){
-      f_bivariate(x,z-x, nu, a, b, l1, l2, l_common)}, z=z) ))*0.1
-  }
-  
-  f_z <- Vectorize(f_z, vectorize.args = "z")
-  
-  
-  # Density of the marginal common jump
-  
-  f_1perp <- function(x, l1, l2, a,b, nu){
-    
-    l_common <- clayton_copula(l1,l2,nu)
-    
-    ((l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu) + l2^(-nu))^(-1/nu-1)*
-      (l1*(1-pgamma(q = x, shape = a, scale = b)))^(-nu-1)*l1*dgamma(x = x, shape = a, scale = b)/l_common
-    
-  }
-  
-  f_1perp <- Vectorize(f_1perp, vectorize.args = "x")
-  
- #  integrate(f_1perp, lower = 0, upper = 100, l1 = 3, l2 = 4, a = 2, b = 5, nu = 0.2)
-  
-  # 
-  # f_indp_perp_tilde_1 <- function(x, p_1, p_1_0, a,b, nu, l1, l2, l_common){
-  #   l1_perp <- l1-l_common
-  #   w_indp <- (p_1*l1_perp)/(p_1*l1_perp + p_1_0*l_common)
-  #   w_com <- (p_1_0*l_common)/(p_1*l1_perp + p_1_0*l_common)
-  #   
-  #   
-  #   return(w_indp*f_indp_perp(x, a[1], b[1], nu, l1, l2, l_common) + w_com*f_z(x, a, b, nu, l1,l2, l_common))
-  #   
-  # }
-  # f_indp_perp_tilde_1 <- Vectorize(f_indp_perp_tilde_1, vectorize.args = 'x' )
-  # 
-  # f_indp_perp_tilde_2 <- function(x, p_2, p_0_2, a,b, nu, l1, l2, l_common){
-  #   l2_perp <- l2-l_common
-  #   w_indp <- (p_2*l2_perp)/(p_2*l2_perp + p_0_2*l_common)
-  #   w_com <- (p_0_2*l_common)/(p_2*l2_perp + p_0_2*l_common)
-  #   
-  #   
-  #   return(w_indp*f_indp_perp(x, a[2], b[2], nu, l2, l1, l_common) + w_com*f_z(x, a, b, nu, l1,l2, l_common))
-  #   
-  # }
-  # f_indp_perp_tilde_2 <- Vectorize(f_indp_perp_tilde_2, vectorize.args = 'x' )
+two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, 
+                             demand,  h_x = 10, 
+                             theta_grid, theta_grid_profit,
+                             f_z_max = 10000, nu, f_z_limit = f_z_max, verbose = TRUE){
   
   
   
   
-  # f_combined <- function(x,l1_perp_tilde,l2_perp_tilde, l_common_tilde,  l1, l2  l_common, a,b,  nu){
-  #   lambda <- l1_perp_tilde + l2_perp_tilde + l_common_tilde
-  #   tmp1 <- l1_perp*f_indp_perp_tilde(x, p_1)/lambda
-  #   tmp2 <- l2_perp*f_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/lambda
-  #   tmp3 <- l_common*f_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )/lambda
-  #   return(tmp1 + tmp2 + tmp3)
-  #   
-  # }
-  # f_combined <- Vectorize(f_combined, vectorize.args = "x")
   
-  
-  
-  # f_combined <- function(x, l1_perp_tilde, l2_perp_tilde, l_common_tilde,  l1, l2,  l_common, a,b,  nu, p_1, p_1_0, p_2, p_0_2){
-  #   
-  #   lambda <- l1_perp_tilde + l2_perp_tilde + l_common_tilde
-  #   
-  #   tmp1 <- l1_perp_tilde*f_indp_perp_tilde_1(x = x, p_1 = p_1, p_1_0 = p_1_0, a = a, b = b, 
-  #                                     nu = nu, l1 = l1, l2 = l2, l_common = l_common)/lambda
-  #   
-  #   tmp2 <- l2_perp_tilde*f_indp_perp_tilde_2(x = x, p_2 = p_2, p_0_2 = p_0_2, a = a, b = b, 
-  #                                     nu = nu, l1 = l2, l2 = l1, l_common = l_common)/lambda
-  #   
-  #   tmp3 <- l_common_tilde*f_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )/lambda
-  #   
-  #   
-  #   return(tmp1 + tmp2 + tmp3)
-  # 
-  # }
-  
-  f_combined <- function(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2){
-    
-    l_common <- clayton_copula(l1,l2,nu)
-    l1_perp <- l1 - l_common
-    l2_perp <- l2 - l_common
-    
-    l_tilde <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
-    
-    
-    val <- p_1*l1_perp*f_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
-      p_2*l2_perp*f_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/l_tilde +
-      p_1_0*l_common*f_1perp(x = x, l1 = l1, l2 = l2, a = a[1], b = b[1], nu = nu)/l_tilde +
-      p_0_2*l_common*f_1perp(x = x, l1 = l2, l2 = l1, a = a[2], b = b[2], nu = nu)/l_tilde +
-      p_1*p_2*l_common*f_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )/l_tilde
-    
-    val[is.nan(val)] <- 0
-    val
-    
-    # p_1*l1_perp/l_tilde + 
-    #   p_2*l2_perp/l_tilde +
-    #   p_1_0*l_common/l_tilde +
-    #   p_0_2*l_common/l_tilde +
-    #   p_1*p_2*l_common/l_tilde
-    
-    
-    
-    
-  }
-  f_combined <- Vectorize(f_combined, vectorize.args = "x")
-  
-  
-  
-  mean_func <- function(x ,l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2 ){
-    x*f_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2 )
-  }
-  
-  
-  
-  
-  thetas_1 <- seq(from = 0, to = 0.5, by = 0.01 )
-  thetas_2 <- seq(from = 0, to = 0.5, by = 0.01 )
+  thetas_1 <- theta_grid_profit
+  thetas_2 <- theta_grid_profit
   expected_income <- list()
   for(i in 1:length(thetas_1)){
     expected_income[[i]] <- list()
@@ -1822,8 +1529,9 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
   # l <- lambda*N*demand(thetas[i])
   #  claim_mean <- l*k*beta/sum(l)
   
-  for(i in 1:length(thetas_1)){
-    for(j in 1:length(thetas_2)){
+  
+  for(i in 1:length(theta_grid)){
+    for(j in 1:length(theta_grid)){
       print(paste(i, j))
       
       demands <- demand(thetas_1[i], thetas_2[j])
@@ -1843,18 +1551,6 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
       p_1_2 <- demands[1]*demands[2]
       
       
-      # 
-      # # Adjust 
-      # l1_perp_tilde <- demands[1]*l1_perp + p_1_0*l_common
-      # 
-      # l2_perp_tilde <- demands[2]*l2_perp + p_0_2*l_common
-      # l_common_tilde <- p_1_2*l_common 
-      
-      
-      # f_combined(5000, l1_perp_tilde = l1_perp_tilde, l_common_tilde = l_common_tilde, l2_perp_tilde = l2_perp_tilde, l1 = l1, l2 = l2,
-      #            l_common = l_common, a = a, b = b, nu = nu, p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2
-      # )
-      
       
       l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
       
@@ -1871,15 +1567,10 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
     }
   }
   expected_income <- do.call(rbind, expected_income)
-  theta_1_ei <- thetas_1
-  theta_2_ei <- thetas_2
+
   
-  thetas_1 <- c(seq(from = 0, to = 029, by = 0.05 ), 
-                seq(from = 0.295, to = 0.35, by = 0.01), 
-                seq(from = 0.355, to = 0.7, by = 0.05 ))
-  thetas_2 <- c(seq(from = 0, to = 029, by = 0.05 ), 
-                seq(from = 0.295, to = 0.35, by = 0.01), 
-                seq(from = 0.355, to = 0.7, by = 0.05 ))
+  thetas_1 <- theta_grid
+  thetas_2 <- theta_grid
   
   
   
@@ -1891,7 +1582,7 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
   V <- matrix(NA, nrow = length(thetas_1), ncol = length(thetas_2))
   for(i in 1:length(thetas_1)){
     for(j in 1:length(thetas_2)){
-      # print(paste0( j + (i-1)*length(thetas_2), " of ", length(thetas_2)*length(thetas_1)))
+      print(paste0( j + (i-1)*length(thetas_2), " of ", length(thetas_2)*length(thetas_1)))
       
       demands <- demand(thetas_1[i], thetas_2[j])
       
@@ -1925,13 +1616,14 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
         V[i,j] <- 1
       }else{
         
-        out <- infinite_survival3(to = 5000, 
-                                h_x = 500, 
+        out <- infinite_survival3(to = x_surplus, 
+                                h_x = h_x, 
                                 p = p,
                                 lambda_true = lambda_true,
                                 mean_true = claim_mean_all,
                                 f_ = f_combined,
-                                l1 = l1, l2 = l2, nu = nu,a = k, b = beta, p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
+                                l1 = l1, l2 = l2, nu = nu, a = k, 
+                                b = beta, p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
         
         V[i,j] <- out$V[length(out$V)]  
       }
@@ -1965,6 +1657,8 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
   ret$V <- V
   ret$theta_1 <- thetas_1
   ret$theta_2 <- thetas_2
+  ret$theta_1_profit <- theta_grid_profit
+  ret$theta_2_profit <- theta_grid_profit
   ret$t1_opt <- t1_opt
   ret$t2_opt <- t2_opt
   ret$expected_income <- expected_income
@@ -1986,111 +1680,7 @@ two_loadings_dep <- function(N, r, fixed_cost, lambda, k, beta, x_surplus, deman
 one_loading_inference_dep2 <- function(N, r, fixed_cost, lambda = rep(1, length(N)), nu, k, beta,  x_surplus, demand, infinite_survival,
                                       h_x = 10, f_z_max = 10000, theta_finess = 0.1, f_z_limit = f_z_max, verbose = TRUE, theta_grid_ruin){
   
-  # We use the clayton copula
-  clayton_copula <- function(x1,x2, nu){
-    tmp <- ((x1)^(-nu)+(x2)^(-nu))^(-1/nu)
-    return(tmp)
-  }
-  
-  
-  
-  f_bivariate <- function(x1, x2,nu, b, a_var, l1, l2, l_common){  
-    copula_density <- function(u1, u2, nu){
-      
-      return((1+nu)*(u1^(-nu)+u2^(-nu))^(-1/nu - 2)*(u1^(-nu-1)*u2^(-nu-1)))
-    }
-    
-    val <- l1*l2*dgamma(x = x1, shape = a_var[1], scale = b[1])*dgamma(x = x2, shape = a_var[2], scale = b[2])*
-      copula_density(u1 = l1*(1-pgamma(q = x1, shape = a_var[1], scale = b[1]) + 0.0001), 
-                     u2 = l2*(1-pgamma(q = x2, shape = a_var[2], scale = b[2]) + 0.0001), nu)/l_common
-    val[val==0] <- 0
-    
-    return(val)
-    
-  }
-  
-  F_z <- function(z,a, b, nu, l1, l2 , l_common){
-    
-    ok <- function(x){
-      integrate(f_bivariate, lower = 0, upper = z-x, x2 = x, nu = nu, b = beta, a_var = a, l1=l1,l2=l2,l_common =l_common)$value
-      
-    }
-    ok <- Vectorize(ok, vectorize.args = "x")
-    
-    integrate(ok, lower = 0, upper = z*10)$value
-    
-    
-  }
-  
-  F_z <- Vectorize(F_z, vectorize.args = "z")
-  
-  
-  
-  F_indp_perp <- function(x, a,b, nu, l1, l2, l_common){
-    l1_perp <- l1-l_common
-    
-    tmp1 <- l1*(1-pgamma(q = x, shape = a, scale = b))/l1_perp
-    
-    tmp2 <- clayton_copula(l1*(1-pgamma(q = x, shape = a, scale = b)), l2,nu)/l1_perp
-    
-    return(1- tmp1+tmp2)
-    
-    
-  }
-  F_indp_perp <- Vectorize(F_indp_perp, vectorize.args = "x")
-  
-  
-  
-  
-  # Distribution of the marginal common jump
-  F_1perp <- function(x, l1, l2, a,b, nu){
-    
-    l_common <- clayton_copula(l1,l2,nu)
-    
-    surv <- 1-pgamma(q = x, shape = a, scale = b)
-    
-    1 - clayton_copula(l1*surv,l2,nu)/l_common
-    
-  }
-  F_1perp <- Vectorize(F_1perp, vectorize.args = "x")
-  
-  
-  
-  
-  F_combined <- function(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2){
-    
-    l_common <- clayton_copula(l1,l2,nu)
-    l1_perp <- l1 - l_common
-    l2_perp <- l2 - l_common
-    
-    l_tilde <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
-    
-    F_z_val <- F_z(z = x, a = a, b = b, nu = nu, l1 = l1, l2 = l2, l_common = l_common )
-    
-    
-    val <- p_1*l1_perp*F_indp_perp(x = x, a = a[1], b = b[1], nu = nu, l1 = l1, l2 = l2, l_common = l_common)/l_tilde + 
-      p_2*l2_perp*F_indp_perp(x = x, a = a[2], b = b[2], nu = nu, l1 = l2, l2 = l1, l_common = l_common)/l_tilde +
-      p_1_0*l_common*F_1perp(x = x, l1 = l1, l2 = l2, a = a[1], b = b[1], nu = nu)/l_tilde +
-      p_0_2*l_common*F_1perp(x = x, l1 = l2, l2 = l1, a = a[2], b = b[2], nu = nu)/l_tilde +
-      p_1*p_2*l_common*F_z_val/l_tilde
-    val[is.nan(val)] <- 0
-    val
-    
-    
-  }
-  F_combined <- Vectorize(F_combined, vectorize.args = "x")
-  
-  S_combined <- function(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2){1-F_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2)}
-  
-  S_combined <- Vectorize(S_combined, vectorize.args = "x")
-  
-  mean_func <- function(x ,l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2 ){
-    S_combined(x, l1, l2, nu,a, b, p_1, p_1_0, p_2, p_0_2 )
-  }
-  
-  mean_func <- Vectorize(mean_func, vectorize.args = "x")
-  
-  
+ 
 
   # Find minimum theta
   thetas <- seq(from = 0, to = 1, by = 0.01)
@@ -2132,7 +1722,7 @@ one_loading_inference_dep2 <- function(N, r, fixed_cost, lambda = rep(1, length(
     
     l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
     
-    claim_mean_all <- integrate(mean_func, lower = 0, upper = f_z_max,
+    claim_mean_all <- integrate(mean_func_S, lower = 0, upper = f_z_max,
                                 l1 = l1, l2 = l2, nu = nu,a = k, b = beta,
                                 p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2,
                                 subdivisions = 5000)$value
@@ -2203,7 +1793,7 @@ one_loading_inference_dep2 <- function(N, r, fixed_cost, lambda = rep(1, length(
       l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
       
       
-      mean_true <-  integrate(mean_func, lower = 0, upper = f_z_max, 
+      mean_true <-  integrate(mean_func_S, lower = 0, upper = f_z_max, 
                               l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
                               p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, 
                               subdivisions = 1000)$value
@@ -2279,4 +1869,577 @@ one_loading_inference_dep2 <- function(N, r, fixed_cost, lambda = rep(1, length(
   
   
 }
+
+
+
+
+
+sensitivity_test <- function(fixed_cost, lambda = rep(1, length(N)), claim_mean, infinite_survival,
+                                       x_surplus, h_x = 10, beta_grid, S_, verbose = TRUE, ...){
+  
+  
+  opt_ruin <- list()
+  opt_ruin_val <- list()
+  opt_profit <- list()
+  opt_profit_val <- list()
+  beta_load <- list()
+  
+  for(beta in beta_grid){
+    print(beta)
+    beta_load[[paste(beta)]] <- 1/(beta*(1-1/3))
+    
+    p <- 1/3
+    b1 <- log((1-p)/p) - 1/(1-p)
+    b2 <- 1/(beta*(1-p))
+    
+    demand <- function(theta){
+      
+      1/(1+exp(b1+b2*theta))
+    }
+
+    
+    expected_profit_fun <- function(param){
+      
+      -((1+param)*lambda*demand(param)*claim_mean -fixed_cost - lambda*demand(param)*claim_mean)
+      
+    }
+    opt_ruin_ <- (1/b2)*(log(claim_mean*lambda/(fixed_cost*b2)) - b1)
+    opt_ruin[[paste(beta)]] <- opt_ruin_
+      
+      
+      mean_true <-  claim_mean
+      lambda_true <-  lambda*demand(opt_ruin_)
+      income <-  (1+opt_ruin_)*demand(opt_ruin_)*(lambda*claim_mean) - fixed_cost
+      
+      out_v <- infinite_survival(to = x_surplus, 
+                                  h_x = 0.01, 
+                                  p = income,
+                                  lambda_true = lambda_true,
+                                  mean_true = mean_true,
+                                  S_ = S_,
+                                  ...)
+      opt_ruin_val[[paste(beta)]] <- out_v$V[length(out_v$V)]
+    
+    
+    out_profit <- optim(c(0.3), expected_profit_fun, method = "BFGS")
+    opt_profit[[paste(beta)]] <- out_profit$par
+    opt_profit_val[[paste(beta)]] <- out_profit$value
+    
+  }
+  
+  
+  return(data.frame(opt_ruin = unlist(opt_ruin), 
+                    opt_ruin_val = unlist(opt_ruin_val), 
+                    opt_profit = unlist(opt_profit), 
+                    opt_profit_val = -unlist(opt_profit_val),
+                    beta = unlist(beta_load),
+                    x = x_surplus))
+
+  
+  
+}
+
+
+
+
+
+
+
+two_loadings_indep_opt_ruin <- function(param, fixed_cost, lambda, k, beta, x_surplus, 
+                               claim_mean,  demand,  h_x = 10, S_){
+  
+  
+
+    l <- demand(param[1], param[2])*lambda/sum(N*demand(param[1], param[2])*lambda)
+    
+    S_tmp<- function(x, a, b){
+      
+      return(sum(l*S_(x, a, b)))
+      
+    }
+    S_tmp <- Vectorize(S_tmp, vectorize.args = "x")
+    
+    lambda_true <- sum(lambda*demand(param[1], param[2]))
+    mean_true <- sum(l*claim_mean)
+    p <-  sum((1+param)*demand(param[1], param[2])*(lambda*k*beta)) - sum(fixed_cost)
+    
+    if(p<mean_true*lambda_true){
+      V <- 1
+    }else{
+      
+      
+      out <- infinite_survival3(to = x_surplus, 
+                                h_x = h_x, 
+                                p = p,
+                                lambda_true = lambda_true,
+                                mean_true = mean_true,
+                                S_ = S_tmp,
+                                a = k,
+                                b = beta)
+      V <- out$V[length(out$V)]  
+    }
+    
+    
+  
+  return(V)
+  
+}
+
+
+
+
+
+#' @param claim_mean - claim mean of the individual claims
+two_loadings_indep_opt_profit <- function(param, fixed_cost, lambda, k, beta, x_surplus, 
+                               claim_mean,  demand,  h_x = 10, S_){
+  
+  
+      demands <- demand(param[1], param[2])
+      l <- demands*lambda/sum(demands*lambda)
+      claim_mean_tmp <- sum(l*claim_mean)
+      
+      expected_income <- sum((1+param)*demands*lambda*k*beta) - sum(fixed_cost) - claim_mean_tmp*sum(lambda*demands)
+
+      
+      
+    return(-expected_income)
+  
+}
+
+
+
+two_loadings_dep_opt_ruin <- function(param,  fixed_cost, lambda, k, beta, x_surplus, 
+                             demand,  h_x = 10, 
+                             f_z_max = 30, nu, f_z_limit = f_z_max){
+  
+  
+
+  
+      demands <- demand(param[1], param[2])
+      
+      l1 <- N[1]*lambda[1]
+      l2 <- N[2]*lambda[2]
+      
+      l_common <- clayton_copula(l1,l2,nu)
+      l1_perp <- l1 - l_common
+      l2_perp <- l2 - l_common
+      
+      # Define probabilities
+      p_1 <- demands[1]
+      p_2 <- demands[2]
+      p_1_0 <- demands[1]*(1-demands[2])
+      p_0_2 <- demands[2]*(1-demands[1])
+      p_1_2 <- demands[1]*demands[2]
+      
+      l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
+      
+      claim_mean_all <- integrate(mean_func, lower = 0, upper = f_z_max, 
+                                  l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
+                                  p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, 
+                                  subdivisions = 5000)$value
+      
+      
+      lambda_true <-  l_all
+      p <-  sum((1+param)*N*demands*(lambda*k*beta)) - sum(fixed_cost)
+      
+      
+      if(p<claim_mean_all*lambda_true){
+        V <- 1
+      }else{
+        
+        out <- infinite_survival3(to = x_surplus, 
+                                  h_x = h_x, 
+                                  p = p,
+                                  lambda_true = lambda_true,
+                                  mean_true = claim_mean_all,
+                                  f_ = f_combined,
+                                  l1 = l1, l2 = l2, nu = nu, a = k, 
+                                  b = beta, p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
+        
+        V <- out$V[length(out$V)]  
+      }
+      
+      return(V)
+  }
+  
+
+
+
+two_loadings_dep_opt_ruin2 <- function(param,  fixed_cost, lambda, k, beta, x_surplus, 
+                                      demand,  h_x = 10, 
+                                      f_z_max = 30, nu, f_z_limit = f_z_max){
+  
+  
+  
+  
+  demands <- demand(param[1], param[2])
+  
+  l1 <- N[1]*lambda[1]
+  l2 <- N[2]*lambda[2]
+  
+  l_common <- clayton_copula(l1,l2,nu)
+  l1_perp <- l1 - l_common
+  l2_perp <- l2 - l_common
+  
+  # Define probabilities
+  p_1 <- demands[1]
+  p_2 <- demands[2]
+  p_1_0 <- demands[1]*(1-demands[2])
+  p_0_2 <- demands[2]*(1-demands[1])
+  p_1_2 <- demands[1]*demands[2]
+  
+  l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
+  
+  claim_mean_all <- integrate(mean_func_S, lower = 0, upper = f_z_max, 
+                              l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
+                              p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, 
+                              subdivisions = 5000)$value
+  
+  
+  lambda_true <-  l_all
+  p <-  sum((1+param)*N*demands*(lambda*k*beta)) - sum(fixed_cost)
+  
+  
+  if(p<claim_mean_all*lambda_true){
+    V <- 1
+  }else{
+    
+    out <- infinite_survival3(to = x_surplus, 
+                              h_x = h_x, 
+                              p = p,
+                              lambda_true = lambda_true,
+                              mean_true = claim_mean_all,
+                              S_ = S_combined,
+                              l1 = l1, l2 = l2, nu = nu, a = k, 
+                              b = beta, p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2)
+    
+    
+    V <- out$V[length(out$V)]  
+  }
+  
+  return(V)
+}
+  
+
+
+two_loadings_dep_opt_profit <- function(param,  fixed_cost, lambda, k, beta, x_surplus, 
+                                        demand,  h_x = 10, 
+                                        f_z_max = 30, nu, f_z_limit = f_z_max){
+  
+
+      demands <- demand(param[1], param[2])
+      
+      l1 <- N[1]*lambda[1]
+      l2 <- N[2]*lambda[2]
+      
+      l_common <- clayton_copula(l1,l2,nu)
+      l1_perp <- l1 - l_common
+      l2_perp <- l2 - l_common
+      
+      # Define probabilities
+      p_1 <- demands[1]
+      p_2 <- demands[2]
+      p_1_0 <- demands[1]*(1-demands[2])
+      p_0_2 <- demands[2]*(1-demands[1])
+      p_1_2 <- demands[1]*demands[2]
+      
+      
+      
+      l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
+      
+      claim_mean_all <- integrate(mean_func, lower = 0, upper = f_z_max, 
+                                  l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
+                                  p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, 
+                                  p_0_2 = p_0_2, subdivisions = 5000)$value
+      
+      
+      
+      expected_income <- sum((1+param)*demands*lambda*k*beta) - sum(fixed_cost) - claim_mean_all*l_all
+      return(-expected_income)
+      
+      
+    }
+  
+
+
+
+two_loadings_dep_opt_profit2 <- function(param,  fixed_cost, lambda, k, beta, x_surplus, 
+                                        demand,  h_x = 10, 
+                                        f_z_max = 30, nu, f_z_limit = f_z_max){
+  
+  
+  demands <- demand(param[1], param[2])
+  
+  l1 <- N[1]*lambda[1]
+  l2 <- N[2]*lambda[2]
+  
+  l_common <- clayton_copula(l1,l2,nu)
+  l1_perp <- l1 - l_common
+  l2_perp <- l2 - l_common
+  
+  # Define probabilities
+  p_1 <- demands[1]
+  p_2 <- demands[2]
+  p_1_0 <- demands[1]*(1-demands[2])
+  p_0_2 <- demands[2]*(1-demands[1])
+  p_1_2 <- demands[1]*demands[2]
+  
+  
+  
+  l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1*p_2)*l_common
+  
+  claim_mean_all <- integrate(mean_func_S, lower = 0, upper = f_z_max, 
+                              l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
+                              p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, 
+                              p_0_2 = p_0_2, subdivisions = 5000)$value
+  
+  
+  
+  expected_income <- sum((1+param)*demands*lambda*k*beta) - sum(fixed_cost) - claim_mean_all*l_all
+  return(-expected_income)
+  
+  
+}
+
+two_loadings_dep_acq_opt_profit <- function(param, fixed_cost, lambda, nu, k, beta,  x_surplus, demand, 
+                                          h_x = 10, f_z_max = 30, f_z_limit = f_z_max, ord_copula, cop_par){
+
+  
+    #  print(i)
+    demands <- demand(param[1], param[2])
+    
+    
+    l1 <- N[1]*lambda[1]
+    l2 <- N[2]*lambda[2]
+    
+    l_common <- clayton_copula(l1,l2,nu)
+    l1_perp <- l1 - l_common
+    l2_perp <- l2 - l_common
+    
+    # Define probabilities
+    p_1 <- demands[1]
+    p_2 <- demands[2]
+    
+    
+    p_1_0 <- ord_copula(1,1-p_2, cop_par)  - ord_copula(1-p_1, 1-p_2, cop_par)
+    p_0_2 <- ord_copula(1-p_1,1, cop_par) - ord_copula(1-p_1, 1-p_2, cop_par)
+    p_1_2 <- ord_copula(1,1, cop_par) - ord_copula(1-p_1,1, cop_par) - ord_copula(1,1-p_2, cop_par) + ord_copula(1-p_1,1-p_2, cop_par)
+    
+    
+    
+    if(any(c(p_1_0>1,p_0_2>1, p_1_2>1))) stop("ordinary copula probability bigger than 1")
+    if(any(c(p_1_0<0,p_0_2<0, p_1_2<0))) stop("ordinary copula probability less than 0")
+    
+    sum_to_one <- integrate(f_combined,lower = 0, upper = f_z_max, 
+                            l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
+                            p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, p_1_2 = p_1_2,
+                            subdivisions = 5000)$value
+
+    
+    if(sum_to_one <0.999){
+      stop(paste0("f_z sum is ", sum_to_one))
+    }
+    
+    l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1_2)*l_common
+    
+    claim_mean_all <- integrate(mean_func, lower = 0, upper = f_z_max, 
+                                l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
+                                p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, 
+                                p_1_2 = p_1_2, subdivisions = 5000)$value
+    
+    expected_income <- sum((1+param)*demands*lambda*k*beta) - sum(fixed_cost) - claim_mean_all*l_all
+    return(-expected_income)
+    
+}
+
+
+two_loadings_dep_acq_opt_profit2 <- function(param, fixed_cost, lambda, nu, k, beta,  x_surplus, demand, 
+                                            h_x = 10, f_z_max = 30, f_z_limit = f_z_max, ord_copula, cop_par){
+  
+  
+  #  print(i)
+  demands <- demand(param[1], param[2])
+  
+  
+  l1 <- N[1]*lambda[1]
+  l2 <- N[2]*lambda[2]
+  
+  l_common <- clayton_copula(l1,l2,nu)
+  l1_perp <- l1 - l_common
+  l2_perp <- l2 - l_common
+  
+  # Define probabilities
+  p_1 <- demands[1]
+  p_2 <- demands[2]
+  
+  
+  p_1_0 <- ord_copula(1,1-p_2, cop_par)  - ord_copula(1-p_1, 1-p_2, cop_par)
+  p_0_2 <- ord_copula(1-p_1,1, cop_par) - ord_copula(1-p_1, 1-p_2, cop_par)
+  p_1_2 <- ord_copula(1,1, cop_par) - ord_copula(1-p_1,1, cop_par) - ord_copula(1,1-p_2, cop_par) + ord_copula(1-p_1,1-p_2, cop_par)
+  
+  
+  
+  if(any(c(p_1_0>1,p_0_2>1, p_1_2>1))) stop("ordinary copula probability bigger than 1")
+  if(any(c(p_1_0<0,p_0_2<0, p_1_2<0))) stop("ordinary copula probability less than 0")
+  
+
+  
+  l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1_2)*l_common
+  
+  claim_mean_all <- integrate(mean_func_S, lower = 0, upper = f_z_max, 
+                              l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
+                              p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2, 
+                              p_1_2 = p_1_2, subdivisions = 5000)$value
+  
+  expected_income <- sum((1+param)*demands*lambda*k*beta) - sum(fixed_cost) - claim_mean_all*l_all
+  return(-expected_income)
+  
+}
+
+
+
+two_loadings_dep_acq_opt_ruin <- function(param, fixed_cost, lambda, nu, k, beta,  x_surplus, demand, 
+                                            h_x = 10, f_z_max = 30, f_z_limit = f_z_max, ord_copula, cop_par){
+  
+  
+      
+      
+      demands <- demand(param[1], param[2])
+      l1 <- N[1]*lambda[1]
+      l2 <- N[2]*lambda[2]
+      
+      l_common <- clayton_copula(l1,l2,nu)
+      l1_perp <- l1 - l_common
+      l2_perp <- l2 - l_common
+      
+      
+      # Define probabilities
+      p_1 <- demands[1]
+      p_2 <- demands[2]
+      
+      
+      p_1_0 <- ord_copula(1,1-p_2, cop_par) - ord_copula(1-p_1, 1-p_2, cop_par)
+      p_0_2 <- ord_copula(1-p_1,1, cop_par) - ord_copula(1-p_1, 1-p_2, cop_par)
+      p_1_2 <- ord_copula(1,1, cop_par) - ord_copula(1-p_1,1, cop_par) - ord_copula(1,1-p_2, cop_par) + ord_copula(1-p_1,1-p_2, cop_par)
+      
+      
+      if(any(c(p_1_0>1,p_0_2>1, p_1_2>1))){
+        warning("ordinary copula probability bigger than 1") 
+        next
+      }
+      if(any(c(p_1_0<0,p_0_2<0, p_1_2<0))){
+        warning("ordinary copula probability less than 0")
+        next
+        
+      } 
+      
+      
+      l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1_2)*l_common
+      
+      
+      
+      mean_true <-  integrate(mean_func, lower = 0, upper = f_z_max, 
+                              l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
+                              p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2,
+                              p_1_2 = p_1_2, subdivisions = 5000)$value
+      lambda_true <-  l_all
+      p <-  sum((1+param)*demands*lambda*k*beta) - sum(fixed_cost)
+      
+      if(p<=mean_true*lambda_true){
+        warning(paste0("Ruin will happen ", param))
+        V <- 1
+      }else{
+        out <- infinite_survival3(to = x_surplus, 
+                                  h_x = h_x, 
+                                  p = p,
+                                  lambda_true = lambda_true,
+                                  mean_true = mean_true,
+                                  f_ = f_combined,
+                                  l1 = l1, l2 = l2, nu = nu,a = k, b = beta, p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2,
+                                  p_0_2 = p_0_2, p_1_2 = p_1_2)
+        
+        V <- out$V[length(out$V)] 
+      }
+      
+      return(V)
+    
+
+}
+
+two_loadings_dep_acq_opt_ruin2 <- function(param, fixed_cost, lambda, nu, k, beta,  x_surplus, demand, 
+                                          h_x = 10, f_z_max = 30, f_z_limit = f_z_max, ord_copula, cop_par){
+  
+  
+  
+  
+  demands <- demand(param[1], param[2])
+  l1 <- N[1]*lambda[1]
+  l2 <- N[2]*lambda[2]
+  
+  l_common <- clayton_copula(l1,l2,nu)
+  l1_perp <- l1 - l_common
+  l2_perp <- l2 - l_common
+  
+  
+  # Define probabilities
+  p_1 <- demands[1]
+  p_2 <- demands[2]
+  
+  
+  p_1_0 <- ord_copula(1,1-p_2, cop_par) - ord_copula(1-p_1, 1-p_2, cop_par)
+  p_0_2 <- ord_copula(1-p_1,1, cop_par) - ord_copula(1-p_1, 1-p_2, cop_par)
+  p_1_2 <- ord_copula(1,1, cop_par) - ord_copula(1-p_1,1, cop_par) - ord_copula(1,1-p_2, cop_par) + ord_copula(1-p_1,1-p_2, cop_par)
+  
+  if(any(c(p_1_0>1,p_0_2>1, p_1_2>1))){
+    warning("ordinary copula probability bigger than 1") 
+    next
+  }
+  if(any(c(p_1_0<0,p_0_2<0, p_1_2<0))){
+    warning("ordinary copula probability less than 0")
+    next
+    
+  } 
+  
+  
+  l_all <- p_1*l1_perp + p_2*l2_perp + (p_1_0 + p_0_2 + p_1_2)*l_common
+  
+  
+  
+  mean_true <-  integrate(mean_func_S, lower = 0, upper = f_z_max, 
+                          l1 = l1, l2 = l2, nu = nu,a = k, b = beta, 
+                          p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2, p_0_2 = p_0_2,
+                          p_1_2 = p_1_2, subdivisions = 5000)$value
+  lambda_true <-  l_all
+  p <-  sum((1+param)*demands*lambda*k*beta) - sum(fixed_cost)
+  
+  if(p<=mean_true*lambda_true){
+    warning(paste0("Ruin will happen ", param))
+    V <- 1
+  }else{
+    out <- infinite_survival3(to = x_surplus, 
+                              h_x = h_x, 
+                              p = p,
+                              lambda_true = lambda_true,
+                              mean_true = mean_true,
+                              S_ = S_combined,
+                              l1 = l1, l2 = l2, nu = nu,a = k, b = beta, p_1 = p_1, p_1_0 = p_1_0, p_2 = p_2,
+                              p_0_2 = p_0_2, p_1_2 = p_1_2)
+    
+    V <- out$V[length(out$V)] 
+  }
+  
+  return(V)
+  
+  
+}
+
+
+
+
+
+gumbel <- function(a,b,cop_par){
+  return(exp(-((-log(a))^cop_par + (-log(b))^cop_par )^(1/cop_par)))
+}
+
+
 

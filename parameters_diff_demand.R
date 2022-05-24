@@ -5,8 +5,11 @@
 # fixed cost is operation cost
 # r should be 0
 
+
+f_z_limit <- 30
 # Fix  surplus values
 x_surplus <- c(2, 5, 10)
+x_surplus_opt <- c(0.2, 0.5, 1, 1.5, 2, 3, 4, 5)
 
 kendell <- c(0.05, 0.15,  0.4,  0.8)
 theta_grid <- c(seq(from = 0.06, to = 0.23, by = 0.01), seq(from = 0.241, to = 0.32, by = 0.001), seq(from = 0.33, to = 0.44, by = 0.01)) 
@@ -15,8 +18,8 @@ theta_grid_ruin <- c(seq(from = 0.06, to = 0.23, by = 0.01), seq(from = 0.241, t
 
 # Define claims
 N <- c(1, 1)
-k <- c(1, 1)
-beta <- c(1, 1)
+k <- c(2, 2)
+beta <- c(1/2, 1/2)
 lambda <- c(10000, 10000)
 fixed_cost <-   c(1000/3, 5*1000/18)
 r <- c(0,0) 
