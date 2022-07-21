@@ -5,35 +5,38 @@
 # fixed cost is operation cost
 # r should be 0
 
-
 f_z_limit <- 30
 # Fix  surplus values
 x_surplus <- c(2, 5, 10)
+
 x_surplus_opt <- c(0.2, 0.5, 1, 1.5, 2, 3, 4, 5)
 
 kendell <- c(0.05, 0.15,  0.4,  0.8)
-theta_grid <- c(seq(from = 0.06, to = 0.23, by = 0.01), seq(from = 0.241, to = 0.32, by = 0.001), seq(from = 0.33, to = 0.44, by = 0.01)) 
-theta_grid_ruin <- c(seq(from = 0.06, to = 0.23, by = 0.01), seq(from = 0.241, to = 0.32, by = 0.001), seq(from = 0.33, to = 0.44, by = 0.01)) 
+theta_grid <- seq(from = 0.15, to = 0.4, by = 0.01)
+theta_grid_ruin <- c(seq(from = 0.01, to = 0.06, by = 0.01), seq(from = 0.061, to = 0.1, by = 0.001), seq(from = 0.11, to = 0.14, by = 0.01)) 
 
+theta_grid_two <- seq(from = 0.28, to = 0.3, by = 0.001)
+theta_grid_profit_two <- seq(from = 0.18, to = 0.24, by = 0.001)
 
 # Define claims
 N <- c(1, 1)
 k <- c(2, 2)
 beta <- c(1/2, 1/2)
 lambda <- c(10000, 10000)
-fixed_cost <-   c(1000/3, 5*1000/18)
+fixed_cost <-   c(5*100/12, 100/3)
 r <- c(0,0) 
 
 nu <- 1
+p_demand <- 1/3
+tt_1 <- 1/20
+tt_2 <- 1/25
 
 
 #' @param b1 - logit parameter intercept
 #' @param b2 - logit parameter loading slope
 demand_1 <- function(theta){
-  p <- 1/3
-  tt <- 1/5
-  b1 <- log((1-p)/p) - 1/(1-p)
-  b2 <- 1/(tt*(1-p))
+  b1 <- log((1-p_demand)/p_demand) - 1/(1-p_demand)
+  b2 <- 1/(tt_1*(1-p_demand))
   
   1/(1+exp(b1+b2*theta))
 }
@@ -41,10 +44,8 @@ demand_1 <- function(theta){
 #' @param b1 - logit parameter intercept
 #' @param b2 - logit parameter loading slope
 demand_2 <- function(theta){
-  p <- 1/3
-  tt <- 1/6
-  b1 <- log((1-p)/p) - 1/(1-p)
-  b2 <- 1/(tt*(1-p))
+  b1 <- log((1-p_demand)/p_demand) - 1/(1-p_demand)
+  b2 <- 1/(tt_2*(1-p_demand))
   
   1/(1+exp(b1+b2*theta))
 }

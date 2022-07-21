@@ -14,7 +14,7 @@ x_surplus_opt <- c(0.2, 0.5, 1, 1.5, 2, 3, 4, 5)
 
 kendell <- c(0.05, 0.15,  0.4,  0.8)
 theta_grid <- seq(from = 0.15, to = 0.4, by = 0.01)
-theta_grid_ruin <- c(seq(from = 0.06, to = 0.28, by = 0.01), seq(from = 0.281, to = 0.31, by = 0.001), seq(from = 0.32, to = 0.44, by = 0.01)) 
+theta_grid_ruin <- c(seq(from = 0.01, to = 0.06, by = 0.01), seq(from = 0.061, to = 0.08, by = 0.001), seq(from = 0.09, to = 0.14, by = 0.01)) 
 
 theta_grid_two <- seq(from = 0.28, to = 0.3, by = 0.001)
 theta_grid_profit_two <- seq(from = 0.18, to = 0.24, by = 0.001)
@@ -24,12 +24,12 @@ N <- c(1, 1)
 k <- c(2, 3)
 beta <- c(1/2, 3/3)
 lambda <- c(10000, 10000/3)
-fixed_cost <-   c(1000/3, 1000/3)
+fixed_cost <-   c(5*100/12, 5*100/12)
 r <- c(0,0) 
 
 nu <- 1
 p_demand <- 1/3
-tt <- 1/5
+tt <- 1/20
 
 
 #' @param b1 - logit parameter intercept

@@ -2163,9 +2163,8 @@ two_loadings_dep_opt_profit <- function(param,  fixed_cost, lambda, k, beta, x_s
 
 
 
-two_loadings_dep_opt_profit2 <- function(param,  fixed_cost, lambda, k, beta, x_surplus, 
-                                        demand,  h_x = 10, 
-                                        f_z_max = 30, nu, f_z_limit = f_z_max){
+two_loadings_dep_opt_profit2 <- function(param,  fixed_cost, lambda, k, beta, x_surplus,demand,  
+                                         h_x = 10, f_z_max = 30, nu, f_z_limit = f_z_max){
   
   
   demands <- demand(param[1], param[2])
@@ -2201,8 +2200,8 @@ two_loadings_dep_opt_profit2 <- function(param,  fixed_cost, lambda, k, beta, x_
   
 }
 
-two_loadings_dep_acq_opt_profit <- function(param, fixed_cost, lambda, nu, k, beta,  x_surplus, demand, 
-                                          h_x = 10, f_z_max = 30, f_z_limit = f_z_max, ord_copula, cop_par){
+two_loadings_dep_acq_opt_profit <- function(param, fixed_cost, lambda,  k, beta,  x_surplus, demand, 
+                                          h_x = 10, f_z_max = 30,nu, f_z_limit = f_z_max, ord_copula, cop_par){
 
   
     #  print(i)
